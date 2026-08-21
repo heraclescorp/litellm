@@ -2433,11 +2433,12 @@ async def _validate_update_key_data(
     # long as they avoided budget/spend.
     #
     # Policy:
-    # - Key owner (same user_id): may update non-budget fields and their
-    #   own key's budget (max_budget / budget_limits) without the admin
-    #   check. Their user-level budget is enforced independently by
-    #   max_budget_limiter, so a raised key budget cannot exceed the
-    #   user cap.
+    # - Key owner (key.user_id == caller): may update the key's own budget
+    #   (max_budget / budget_limits) without the admin check. Their
+    #   user-level budget is enforced independently by max_budget_limiter,
+    #   so a raised key budget cannot exceed the user cap.
+    # - Key creator (created_by == caller AND still owns it): may update
+    #   non-budget fields without the admin check.
     # - Team member with /key/update grant (on a team key): may update
     #   non-budget fields. Team membership + permission is already
     #   enforced by can_team_member_execute_key_management_endpoint
@@ -2476,14 +2477,22 @@ async def _validate_update_key_data(
             detail={"error": "Only proxy admins can enable throttle_on_budget_exceeded on a key."},
         )
 
-    # Personal-key bypass: the caller both created the key AND still owns it
-    # (user_id == caller).  Checking only created_by would let a demoted admin
-    # who originally created a key for another user continue editing it without
-    # admin authorization after the key was reassigned.
-    caller_is_creator: Final = (
+    # Personal-key bypass separates "owner" from "creator":
+    # - owner: the key's user_id == caller. Budget fields (max_budget /
+    #   budget_limits) are safe for the owner to change because the
+    #   user-level budget is enforced independently by max_budget_limiter.
+    # - creator: created_by == caller AND still owns it (user_id == caller).
+    #   Non-budget fields (models, alias, allowed_routes, ...) can escalate
+    #   privilege, so they stay gated to the creator — checking only
+    #   created_by would let a demoted admin who created a key for another
+    #   user keep editing it after the key was reassigned.
+    caller_is_owner: Final = (
         user_api_key_dict.user_id is not None
-        and getattr(existing_key_row, "created_by", None) == user_api_key_dict.user_id
         and getattr(existing_key_row, "user_id", None) == user_api_key_dict.user_id
+    )
+    caller_is_creator: Final = (
+        caller_is_owner
+        and getattr(existing_key_row, "created_by", None) == user_api_key_dict.user_id
     )
     # Team keys: can_team_member_execute_key_management_endpoint (called above)
     # already validated team membership + /key/update permission and would have
@@ -2492,7 +2501,8 @@ async def _validate_update_key_data(
     # _check_key_admin_access that would otherwise require team/org admin status.
     _key_is_team_key: Final = getattr(existing_key_row, "team_id", None) is not None
     can_skip_admin_check: Final = (
-        (caller_is_creator and not _is_spend_change)
+        (caller_is_owner and _is_budget_change and not _is_spend_change)
+        or (caller_is_creator and not _is_budget_change and not _is_spend_change)
         or (_key_is_team_key and not _is_budget_change and not _is_spend_change)
     )
     if (not _is_proxy_admin) and prisma_client is not None and not can_skip_admin_check:
