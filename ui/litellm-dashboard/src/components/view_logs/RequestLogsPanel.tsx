@@ -3,6 +3,7 @@
 import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
 import type { ColumnFiltersState, OnChangeFn, PaginationState, SortingState } from "@tanstack/react-table";
 import moment from "moment";
+import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AutoRouterModelGroupsProvider } from "@/components/shared/table_cells";
@@ -44,7 +45,14 @@ interface SessionComposition {
 export default function RequestLogsPanel({ accessToken, token, userRole, userID, isActive }: RequestLogsPanelProps) {
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE });
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_LOGS_SORTING);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  // A PR links to its own calls: /ui/logs/?spend_logs_metadata_value=owner/repo:123
+  // seeds the filter on first render; after that the filter is the source of truth.
+  const [urlSpendLogsMetadataValue] = useQueryState(LOG_FILTER_IDS.SPEND_LOGS_METADATA_VALUE, parseAsString);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() =>
+    urlSpendLogsMetadataValue
+      ? [{ id: LOG_FILTER_IDS.SPEND_LOGS_METADATA_VALUE, value: urlSpendLogsMetadataValue }]
+      : [],
+  );
 
   const [startTime, setStartTime] = useState<string>(moment().subtract(24, "hours").format("YYYY-MM-DDTHH:mm"));
   const [endTime, setEndTime] = useState<string>(moment().format("YYYY-MM-DDTHH:mm"));

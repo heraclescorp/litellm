@@ -30,7 +30,12 @@ export const LOG_FILTER_IDS = {
   PUBLIC_MODEL_OR_SEARCH_TOOL: "model",
   REQUEST_ID: "request_id",
   USER_ID: "user_id",
+  SPEND_LOGS_METADATA_VALUE: "spend_logs_metadata_value",
 } as const;
+
+// The spend-logs metadata key the "PR link" filter queries; clients stamp it with
+// the `x-litellm-spend-logs-metadata` header.
+export const PR_LINK_METADATA_KEY = "pr_link";
 
 export const LOG_FILTER_LABELS: Record<string, string> = {
   [LOG_FILTER_IDS.TEAM_ID]: "Team ID",
@@ -44,6 +49,7 @@ export const LOG_FILTER_LABELS: Record<string, string> = {
   [LOG_FILTER_IDS.SESSION_ID]: "Session ID",
   [LOG_FILTER_IDS.MODEL_ID]: "Model",
   [LOG_FILTER_IDS.PUBLIC_MODEL_OR_SEARCH_TOOL]: "Public model / search tool",
+  [LOG_FILTER_IDS.SPEND_LOGS_METADATA_VALUE]: "PR link",
 };
 
 export interface LogsWindow {
@@ -152,6 +158,7 @@ export function useLogFilterLogic({
       const window = formatLogsWindow(startTime, endTime, isCustomDate);
 
       const userIdFilter = getFilterValue(columnFilters, LOG_FILTER_IDS.USER_ID);
+      const prLinkFilter = getFilterValue(columnFilters, LOG_FILTER_IDS.SPEND_LOGS_METADATA_VALUE);
 
       return await uiSpendLogsCall({
         accessToken,
@@ -170,6 +177,9 @@ export function useLogFilterLogic({
           model_id: getFilterValue(columnFilters, LOG_FILTER_IDS.MODEL_ID),
           model: getFilterValue(columnFilters, LOG_FILTER_IDS.PUBLIC_MODEL_OR_SEARCH_TOOL),
           key_alias: getFilterValue(columnFilters, LOG_FILTER_IDS.KEY_ALIAS),
+          // One field, two params: the API needs the pair, and an empty value drops both.
+          spend_logs_metadata_key: prLinkFilter ? PR_LINK_METADATA_KEY : undefined,
+          spend_logs_metadata_value: prLinkFilter,
           error_code: getFilterValue(columnFilters, LOG_FILTER_IDS.ERROR_CODE),
           error_message: getFilterValue(columnFilters, LOG_FILTER_IDS.ERROR_MESSAGE),
           sort_by: sortBy,
