@@ -2007,6 +2007,10 @@ interface UiSpendLogsParams {
   /** Filter by model ID (litellm model deployment id) */
   model_id?: string;
   key_alias?: string;
+  /** Spend-logs metadata key to filter on (e.g. "pr_link"), see x-litellm-spend-logs-metadata */
+  spend_logs_metadata_key?: string;
+  /** Value spend_logs_metadata_key must equal; sent alongside the key */
+  spend_logs_metadata_value?: string;
   error_code?: string;
   error_message?: string;
   sort_by?: string;
