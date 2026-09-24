@@ -9,5 +9,33 @@ mcp_servers:
       GOOGLE_DRIVE_MCP_TOKEN_PATH: /config/tokens.json
     allowed_tools:
       - search
-      - gdrive_read_file
-      - gdrive_list_files
+      - listFolder
+      - createFolder
+      - createTextFile
+      - updateTextFile
+      - readTextFile
+      - deleteItem
+      - renameItem
+      - moveItem
+      - copyFile
+      - getFileMetadata
+      - exportFile
+      - downloadFile
+      - uploadFile
+      - shareFile
+      - removePermission
+      - readGoogleDoc
+      - createGoogleDoc
+      - updateGoogleDoc
+      - getGoogleDocContent
+      - appendToDoc
+      - insertTextInDoc
+      - deleteTextInDoc
+      - replaceTextInDoc
+      - formatGoogleDocRange
+      - readGoogleSheet
+      - createGoogleSheet
+      - updateGoogleSheet
+      - getGoogleSheetContent
+      - createGoogleSlides
+      - updateGoogleSlides
