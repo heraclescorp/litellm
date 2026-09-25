@@ -3,7 +3,7 @@ mcp_servers:
     transport: stdio
     command: /usr/bin/node
     args:
-      - /opt/mcp/google-drive-mcp/dist/index.js
+      - /app/mcp/google-drive-mcp/dist/index.js
     env:
       GOOGLE_DRIVE_OAUTH_CREDENTIALS: /config/gcp-oauth.keys.json
       GOOGLE_DRIVE_MCP_TOKEN_PATH: /config/tokens.json
@@ -12,30 +12,15 @@ mcp_servers:
       - listFolder
       - createFolder
       - createTextFile
-      - updateTextFile
       - readTextFile
-      - deleteItem
-      - renameItem
-      - moveItem
       - copyFile
       - getFileMetadata
-      - exportFile
-      - downloadFile
-      - uploadFile
-      - shareFile
-      - removePermission
       - readGoogleDoc
       - createGoogleDoc
-      - updateGoogleDoc
       - getGoogleDocContent
       - appendToDoc
       - insertTextInDoc
-      - deleteTextInDoc
-      - replaceTextInDoc
-      - formatGoogleDocRange
       - readGoogleSheet
       - createGoogleSheet
-      - updateGoogleSheet
       - getGoogleSheetContent
       - createGoogleSlides
-      - updateGoogleSlides

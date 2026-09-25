@@ -1,16 +1,12 @@
 ARG LITELLM_BASE_IMAGE=litellm-base:local
 FROM ${LITELLM_BASE_IMAGE}
 
-USER root
+ARG MCP_HOME=/app/mcp
 
-RUN mkdir -p /opt/mcp /config
-
-COPY .mcp-build/ /opt/mcp/
-
-COPY config/mcp-servers.yml /opt/mcp/mcp-servers.yml
-
-RUN chown -R 65534:0 /opt/mcp /config && \
-    chmod -R a+rX /opt/mcp && \
-    chmod 750 /config
+COPY --chown=65534:0 .mcp-build/ ${MCP_HOME}/
+COPY --chown=65534:0 config/mcp-servers.yml ${MCP_HOME}/mcp-servers.yml
+COPY --chown=65534:0 docker/merge-and-start.sh /app/docker/merge-and-start.sh
 
 USER 65534
+
+ENTRYPOINT ["/app/docker/merge-and-start.sh"]
