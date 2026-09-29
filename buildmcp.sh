@@ -8,6 +8,7 @@ BUILD_ROOT=".mcp-build"
 
 MCP_DIRS=(
     "$MCP_ROOT/google-drive-mcp"
+    "$MCP_ROOT/figma-mcp"
 )
 
 rm -rf "$BUILD_ROOT"
