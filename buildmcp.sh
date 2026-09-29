@@ -16,6 +16,9 @@ mkdir -p "$BUILD_ROOT"
 
 git submodule update --init --recursive
 
+corepack enable
+corepack install --global pnpm@10.10.0
+
 for mcp_dir in "${MCP_DIRS[@]}"; do
     mcp_name="$(basename "$mcp_dir")"
     artifact_dir="$BUILD_ROOT/$mcp_name"
