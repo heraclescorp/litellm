@@ -22,19 +22,27 @@ for mcp_dir in "${MCP_DIRS[@]}"; do
 
     echo "Building $mcp_name"
 
-    npm --prefix "$mcp_dir" install \
-        --include=dev \
-        --ignore-scripts \
-        --no-audit \
-        --no-fund 
+    if [[ -f "$mcp_dir/pnpm-lock.yaml" ]]; then
+        pnpm --dir "$mcp_dir" install --frozen-lockfile
+        pnpm --dir "$mcp_dir" build
+        pnpm --dir "$mcp_dir" prune --prod
+        lockfile="pnpm-lock.yaml"
+    else
+        npm --prefix "$mcp_dir" install \
+            --include=dev \
+            --ignore-scripts \
+            --no-audit \
+            --no-fund 
 
-    npm --prefix "$mcp_dir" run build
-    npm --prefix "$mcp_dir" prune --omit=dev --ignore-scripts
+        npm --prefix "$mcp_dir" run build
+        npm --prefix "$mcp_dir" prune --omit=dev --ignore-scripts
+        lockfile="package-lock.json"
+    fi
 
     mkdir -p "$artifact_dir"
 
     cp "$mcp_dir/package.json" "$artifact_dir/package.json"
-    cp "$mcp_dir/package-lock.json" "$artifact_dir/package-lock.json"
+    cp "$mcp_dir/$lockfile" "$artifact_dir/$lockfile"
     cp -a "$mcp_dir/node_modules" "$artifact_dir/node_modules"
     cp -a "$mcp_dir/dist" "$artifact_dir/dist"
 done
