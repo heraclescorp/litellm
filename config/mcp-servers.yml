@@ -31,7 +31,7 @@ mcp_servers:
     transport: stdio
     command: /usr/bin/node
     args:
-      - /opt/mcp/figma-mcp/dist/bin.js
+      - /app/mcp/figma-mcp/dist/bin.js
       - --stdio
     env:
       FIGMA_API_KEY: os.environ/FIGMA_API_KEY
