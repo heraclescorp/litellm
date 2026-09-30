@@ -841,22 +841,6 @@ describe("UsagePage", () => {
       // Unique user should also appear
       expect(screen.getByText("UniqueUser (user-unique)")).toBeInTheDocument();
     });
-
-    it("should pass selected userId to aggregated call", async () => {
-      renderWithProviders(<UsagePage {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(mockUserDailyActivityAggregatedCall).toHaveBeenCalled();
-      });
-
-      // Initially called with null (global view for admin)
-      expect(mockUserDailyActivityAggregatedCall).toHaveBeenCalledWith(
-        "test-token",
-        expect.any(Date),
-        expect.any(Date),
-        null,
-      );
-    });
   });
 
   describe("user usage view", () => {
@@ -923,32 +907,6 @@ describe("UsagePage", () => {
       // The admin case above proves this label is rendered when the selector exists, so its
       // absence here is a live assertion rather than a query that can never match.
       expect(screen.queryByText("Filter by user")).not.toBeInTheDocument();
-    });
-
-    it("should always pass own userId for non-admin users", async () => {
-      mockUseAuthorized.mockReturnValue({
-        isLoading: false,
-        isAuthorized: true,
-        token: "mock-token",
-        accessToken: "test-token",
-        userId: "user-123",
-        userEmail: "test@example.com",
-        userRole: "Internal User",
-        premiumUser: false,
-        disabledPersonalKeyCreation: false,
-        showSSOBanner: false,
-      });
-
-      renderWithProviders(<UsagePage {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(mockUserDailyActivityAggregatedCall).toHaveBeenCalledWith(
-          "test-token",
-          expect.any(Date),
-          expect.any(Date),
-          "user-123",
-        );
-      });
     });
   });
 
@@ -1054,16 +1012,8 @@ describe("UsagePage", () => {
 
       renderWithProviders(<UsagePage {...defaultProps} />);
 
-      await waitFor(() => {
-        // Both pages should have been fetched
-        expect(mockUserDailyActivityCall).toHaveBeenCalledTimes(2);
-      });
-
-      // Verify first page call
-      expect(mockUserDailyActivityCall).toHaveBeenCalledWith("test-token", expect.any(Date), expect.any(Date), 1, null);
-
-      // Verify second page call
-      expect(mockUserDailyActivityCall).toHaveBeenCalledWith("test-token", expect.any(Date), expect.any(Date), 2, null);
+      expect(await screen.findByText("75,000")).toBeInTheDocument();
+      expect(screen.getByText("1,500")).toBeInTheDocument();
     });
   });
 

@@ -180,7 +180,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
     const rangeKey = currentAggregatedRangeKey;
     setAggregatedLoading(true);
 
-    userDailyActivityAggregatedCall(accessToken, startTime, endTime, effectiveUserId)
+    userDailyActivityAggregatedCall(accessToken, startTime, endTime, effectiveUserId, true)
       .then((data) => {
         if (aggregatedFetchIdRef.current !== fetchId) return;
         setAggregatedData({ rangeKey, value: data });
@@ -225,7 +225,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
   // Paginated fallback — only enabled when aggregated endpoint fails
   const paginatedResult = usePaginatedDailyActivity({
     fetchFn: userDailyActivityCall,
-    args: [accessToken, startTime, endTime, effectiveUserId],
+    args: [accessToken, startTime, endTime, effectiveUserId, true],
     enabled: aggregatedFailed && !!accessToken && !!startTime && !!endTime,
   });
 
