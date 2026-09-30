@@ -24,3 +24,15 @@ mcp_servers:
       - createGoogleSheet
       - getGoogleSheetContent
       - createGoogleSlides
+
+  FIGMA:
+    transport: stdio
+    command: /usr/bin/node
+    args:
+      - /app/mcp/figma-mcp/dist/bin.js
+      - --stdio
+    env:
+      FIGMA_API_KEY: os.environ/FIGMA_API_KEY
+    allowed_tools:
+      - get_figma_data
+      - download_figma_images
