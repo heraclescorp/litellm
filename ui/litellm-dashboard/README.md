@@ -20,6 +20,14 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
 
+## Usage reporting
+
+The Usage page includes the current UTC day's spend bucket when the selected range reaches today in the browser's timezone. Both the aggregated user-activity request and its paginated fallback send `include_current_utc_day=true` with the browser's timezone offset, so Pacific-evening spend remains visible after UTC midnight.
+
+Daily chart dates and historical totals remain UTC-bucketed. This does not convert reporting to Pacific calendar days or change gateway-request and entity-specific activity endpoints.
+
+The initial Usage view is Global Usage for admins and Your Usage for internal users, with a seven-day date range. Users can select other permitted views and date presets, but these defaults are not configurable through proxy settings and selections are not persisted across reloads.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

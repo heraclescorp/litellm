@@ -965,6 +965,16 @@ describe("UsagePage", () => {
       expect(screen.getByText("UniqueUser (user-unique)")).toBeInTheDocument();
     });
 
+    it("should include the current UTC day so spend keeps updating after UTC midnight", async () => {
+      renderWithProviders(<UsagePage {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(mockUserDailyActivityAggregatedCall).toHaveBeenCalledWith(
+          expect.objectContaining({ includeCurrentUtcDay: true }),
+        );
+      });
+    });
+
     it("should pass selected userId to aggregated call", async () => {
       renderWithProviders(<UsagePage {...defaultProps} />);
 
