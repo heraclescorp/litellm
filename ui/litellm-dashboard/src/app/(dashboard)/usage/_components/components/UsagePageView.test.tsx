@@ -841,6 +841,18 @@ describe("UsagePage", () => {
       // Unique user should also appear
       expect(screen.getByText("UniqueUser (user-unique)")).toBeInTheDocument();
     });
+
+    it("should show global totals when no user is selected", async () => {
+      mockUserDailyActivityAggregatedCall.mockImplementation(async (_token, _start, _end, userId) => ({
+        ...mockSpendData,
+        metadata: { ...mockSpendData.metadata, total_api_requests: userId === null ? 1500 : 700 },
+      }));
+
+      renderWithProviders(<UsagePage {...defaultProps} />);
+
+      expect(await screen.findByText("1,500")).toBeInTheDocument();
+      expect(screen.queryByText("700")).not.toBeInTheDocument();
+    });
   });
 
   describe("user usage view", () => {
@@ -907,6 +919,30 @@ describe("UsagePage", () => {
       // The admin case above proves this label is rendered when the selector exists, so its
       // absence here is a live assertion rather than a query that can never match.
       expect(screen.queryByText("Filter by user")).not.toBeInTheDocument();
+    });
+
+    it("should show only own usage for non-admin users", async () => {
+      mockUseAuthorized.mockReturnValue({
+        isLoading: false,
+        isAuthorized: true,
+        token: "mock-token",
+        accessToken: "test-token",
+        userId: "user-123",
+        userEmail: "test@example.com",
+        userRole: "Internal User",
+        premiumUser: false,
+        disabledPersonalKeyCreation: false,
+        showSSOBanner: false,
+      });
+      mockUserDailyActivityAggregatedCall.mockImplementation(async (_token, _start, _end, userId) => ({
+        ...mockSpendData,
+        metadata: { ...mockSpendData.metadata, total_api_requests: userId === "user-123" ? 700 : 1500 },
+      }));
+
+      renderWithProviders(<UsagePage {...defaultProps} />);
+
+      expect(await screen.findByText("700")).toBeInTheDocument();
+      expect(screen.queryByText("1,500")).not.toBeInTheDocument();
     });
   });
 
