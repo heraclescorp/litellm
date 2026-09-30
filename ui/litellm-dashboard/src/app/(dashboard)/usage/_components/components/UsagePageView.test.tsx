@@ -842,20 +842,16 @@ describe("UsagePage", () => {
       expect(screen.getByText("UniqueUser (user-unique)")).toBeInTheDocument();
     });
 
-    it("should pass selected userId to aggregated call", async () => {
+    it("should show global totals when no user is selected", async () => {
+      mockUserDailyActivityAggregatedCall.mockImplementation(async (_token, _start, _end, userId) => ({
+        ...mockSpendData,
+        metadata: { ...mockSpendData.metadata, total_api_requests: userId === null ? 1500 : 700 },
+      }));
+
       renderWithProviders(<UsagePage {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(mockUserDailyActivityAggregatedCall).toHaveBeenCalled();
-      });
-
-      // Initially called with null (global view for admin)
-      expect(mockUserDailyActivityAggregatedCall).toHaveBeenCalledWith(
-        "test-token",
-        expect.any(Date),
-        expect.any(Date),
-        null,
-      );
+      expect(await screen.findByText("1,500")).toBeInTheDocument();
+      expect(screen.queryByText("700")).not.toBeInTheDocument();
     });
   });
 
@@ -925,7 +921,7 @@ describe("UsagePage", () => {
       expect(screen.queryByText("Filter by user")).not.toBeInTheDocument();
     });
 
-    it("should always pass own userId for non-admin users", async () => {
+    it("should show only own usage for non-admin users", async () => {
       mockUseAuthorized.mockReturnValue({
         isLoading: false,
         isAuthorized: true,
@@ -938,17 +934,15 @@ describe("UsagePage", () => {
         disabledPersonalKeyCreation: false,
         showSSOBanner: false,
       });
+      mockUserDailyActivityAggregatedCall.mockImplementation(async (_token, _start, _end, userId) => ({
+        ...mockSpendData,
+        metadata: { ...mockSpendData.metadata, total_api_requests: userId === "user-123" ? 700 : 1500 },
+      }));
 
       renderWithProviders(<UsagePage {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(mockUserDailyActivityAggregatedCall).toHaveBeenCalledWith(
-          "test-token",
-          expect.any(Date),
-          expect.any(Date),
-          "user-123",
-        );
-      });
+      expect(await screen.findByText("700")).toBeInTheDocument();
+      expect(screen.queryByText("1,500")).not.toBeInTheDocument();
     });
   });
 
@@ -1054,16 +1048,8 @@ describe("UsagePage", () => {
 
       renderWithProviders(<UsagePage {...defaultProps} />);
 
-      await waitFor(() => {
-        // Both pages should have been fetched
-        expect(mockUserDailyActivityCall).toHaveBeenCalledTimes(2);
-      });
-
-      // Verify first page call
-      expect(mockUserDailyActivityCall).toHaveBeenCalledWith("test-token", expect.any(Date), expect.any(Date), 1, null);
-
-      // Verify second page call
-      expect(mockUserDailyActivityCall).toHaveBeenCalledWith("test-token", expect.any(Date), expect.any(Date), 2, null);
+      expect(await screen.findByText("75,000")).toBeInTheDocument();
+      expect(screen.getByText("1,500")).toBeInTheDocument();
     });
   });
 
