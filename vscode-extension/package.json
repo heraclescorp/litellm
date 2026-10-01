@@ -67,7 +67,7 @@
     ]
   },
   "scripts": {
-    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node22",
+    "build": "node init && esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node22",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "vscode:prepublish": "npm run typecheck && npm run build",
