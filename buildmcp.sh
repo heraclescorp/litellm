@@ -7,7 +7,7 @@ MCP_ROOT="mcp-servers"
 BUILD_ROOT=".mcp-build"
 
 MCP_DIRS=(
-    "$MCP_ROOT/google-drive-mcp"
+
 )
 
 rm -rf "$BUILD_ROOT"

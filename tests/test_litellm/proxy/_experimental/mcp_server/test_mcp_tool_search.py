@@ -20,6 +20,7 @@ from litellm.proxy._experimental.mcp_server.faults.list_outcomes import Aggregat
 from litellm.proxy._experimental.mcp_server.tool_search import (
     MCP_TOOL_CALL_TOOL_NAME,
     MCP_TOOL_SEARCH_TOOL_NAME,
+    SLACK_MESSAGE_SELF_TOOL_NAME,
     coerce_top_k,
     get_virtual_tool_definitions,
     search_tools,
@@ -114,8 +115,8 @@ class TestSearchTools:
 
 
 class TestGetVirtualToolDefinitions:
-    def test_returns_two_tools(self) -> None:
-        assert len(get_virtual_tool_definitions()) == 2
+    def test_returns_three_tools(self) -> None:
+        assert len(get_virtual_tool_definitions()) == 3
 
     def test_has_mcp_tool_search(self) -> None:
         names = [t["name"] for t in get_virtual_tool_definitions()]
@@ -153,6 +154,7 @@ class TestGetVirtualToolDefinitions:
         assert {t.name for t in built} == {
             MCP_TOOL_SEARCH_TOOL_NAME,
             MCP_TOOL_CALL_TOOL_NAME,
+            SLACK_MESSAGE_SELF_TOOL_NAME,
         }
 
 
@@ -187,7 +189,11 @@ class TestListToolRestApiWithToolSearch:
 
         assert result["error"] is None
         tool_names = [t["name"] for t in result["tools"]]
-        assert set(tool_names) == {MCP_TOOL_SEARCH_TOOL_NAME, MCP_TOOL_CALL_TOOL_NAME}
+        assert set(tool_names) == {
+            MCP_TOOL_SEARCH_TOOL_NAME,
+            MCP_TOOL_CALL_TOOL_NAME,
+            SLACK_MESSAGE_SELF_TOOL_NAME,
+        }
 
     @pytest.mark.asyncio
     async def test_returns_full_catalog_when_flag_disabled(self) -> None:
@@ -204,12 +210,15 @@ class TestListToolRestApiWithToolSearch:
         mock_request = MagicMock()
         mock_request.headers = {}
 
+        from litellm.proxy._experimental.mcp_server.server import ListMCPToolsRestAPIResponseObject
+
         fake_tools = [
-            {
-                "name": "github-create_issue",
-                "description": "Create issue",
-                "inputSchema": {"type": "object"},
-            }
+            ListMCPToolsRestAPIResponseObject(
+                name="github-create_issue",
+                description="Create issue",
+                inputSchema={"type": "object"},
+                mcp_info={"server_name": "github"},
+            )
         ]
 
         list_fn = next(
@@ -260,9 +269,10 @@ class TestListToolRestApiWithToolSearch:
                 user_api_key_dict=user_api_key_dict,
             )
 
-        tool_names = [t["name"] for t in result["tools"]]
+        tool_names = [t.name for t in result["tools"]]
         assert MCP_TOOL_SEARCH_TOOL_NAME not in tool_names
         assert "github-create_issue" in tool_names
+        assert SLACK_MESSAGE_SELF_TOOL_NAME in tool_names
 
     @pytest.mark.asyncio
     async def test_admin_include_disabled_tools_bypasses_virtual_catalog(self) -> None:
@@ -283,12 +293,15 @@ class TestListToolRestApiWithToolSearch:
         mock_request = MagicMock()
         mock_request.headers = {}
 
+        from litellm.proxy._experimental.mcp_server.server import ListMCPToolsRestAPIResponseObject
+
         fake_tools = [
-            {
-                "name": "github-create_issue",
-                "description": "Create issue",
-                "inputSchema": {"type": "object"},
-            }
+            ListMCPToolsRestAPIResponseObject(
+                name="github-create_issue",
+                description="Create issue",
+                inputSchema={"type": "object"},
+                mcp_info={"server_name": "github"},
+            )
         ]
 
         list_fn = next(
@@ -339,7 +352,7 @@ class TestListToolRestApiWithToolSearch:
                 user_api_key_dict=user_api_key_dict,
             )
 
-        tool_names = [t["name"] for t in result["tools"]]
+        tool_names = [t.name for t in result["tools"]]
         assert MCP_TOOL_SEARCH_TOOL_NAME not in tool_names
         assert "github-create_issue" in tool_names
 
@@ -394,6 +407,47 @@ class TestCallToolRestApiVirtualTools:
         returned_tools = json.loads(result.content[0].text)
         assert isinstance(returned_tools, list)
         assert any(t["name"] == "github-create_issue" for t in returned_tools)
+
+    @pytest.mark.asyncio
+    async def test_slack_message_self_callable_without_tool_search_flag(self) -> None:
+        user_api_key_dict = UserAPIKeyAuth(
+            api_key="test_key",
+            object_permission=_make_perm(
+                mcp_tool_search_enabled=False,
+                mcp_servers=["slack"],
+            ),
+        )
+
+        request = self._make_request(
+            {"name": SLACK_MESSAGE_SELF_TOOL_NAME, "arguments": {"message": "hello"}}
+        )
+
+        fake_pre_call = MagicMock()
+        fake_pre_call.return_value.common_processing_pre_call_logic = AsyncMock(return_value=({}, MagicMock()))
+
+        with (
+            patch(
+                "litellm.proxy._experimental.mcp_server.slack_wrapper.send_message_to_self",
+                new_callable=AsyncMock,
+                return_value="sent",
+            ) as mock_wrapper,
+            patch(
+                "litellm.proxy.common_request_processing.ProxyBaseLLMRequestProcessing",
+                fake_pre_call,
+            ),
+            patch(
+                "litellm.proxy._experimental.mcp_server.rest_endpoints._safe_fire_mcp_tool_call_logging",
+                new=AsyncMock(side_effect=lambda _logging_obj, result, *_args, **_kwargs: result),
+            ),
+        ):
+            result = await self._get_call_fn()(
+                request=request,
+                user_api_key_dict=user_api_key_dict,
+            )
+
+        mock_wrapper.assert_awaited_once()
+        assert mock_wrapper.await_args.kwargs["message"] == "hello"
+        assert result.content[0].text == "sent"
 
     @pytest.mark.asyncio
     async def test_mcp_tool_call_executes_discovered_tool(self) -> None:
@@ -850,6 +904,7 @@ class TestHandleListToolsVirtual:
         assert {t.name for t in tools} == {
             MCP_TOOL_SEARCH_TOOL_NAME,
             MCP_TOOL_CALL_TOOL_NAME,
+            SLACK_MESSAGE_SELF_TOOL_NAME,
         }
 
 

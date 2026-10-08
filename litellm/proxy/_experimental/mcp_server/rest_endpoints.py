@@ -29,6 +29,7 @@ from litellm.proxy._experimental.mcp_server.utils import (
     MCPMissingUserEnvVarsError,
     get_server_prefix,
     merge_mcp_headers,
+    normalize_server_name,
 )
 from litellm.proxy._types import (
     LitellmUserRoles,
@@ -169,6 +170,7 @@ if MCP_AVAILABLE:
         )
         from litellm.proxy._experimental.mcp_server.tool_search import (
             MCP_TOOL_SEARCH_TOOL_NAME,
+            SLACK_MESSAGE_SELF_TOOL_NAME,
             coerce_top_k,
             handle_mcp_tool_call,
             handle_mcp_tool_search,
@@ -176,7 +178,10 @@ if MCP_AVAILABLE:
         from litellm.proxy.common_request_processing import ProxyBaseLLMRequestProcessing
         from litellm.proxy.proxy_server import general_settings, proxy_config, proxy_logging_obj
 
-        if not getattr(getattr(user_api_key_dict, "object_permission", None), "mcp_tool_search_enabled", False):
+        # slack_message_self is always callable; only the tool-search pair is opt-in.
+        if tool_name != SLACK_MESSAGE_SELF_TOOL_NAME and not getattr(
+            getattr(user_api_key_dict, "object_permission", None), "mcp_tool_search_enabled", False
+        ):
             raise HTTPException(
                 status_code=403,
                 detail={"error": "forbidden", "message": f"{tool_name} requires mcp_tool_search_enabled on the key"},
@@ -199,6 +204,45 @@ if MCP_AVAILABLE:
                 mcp_server_auth_headers=virtual_mcp_server_auth_headers,
                 oauth2_headers=virtual_oauth2_headers,
                 raw_headers=virtual_raw_headers,
+            )
+        if tool_name == SLACK_MESSAGE_SELF_TOOL_NAME:
+            from mcp.types import CallToolResult, TextContent
+
+            from litellm.proxy._experimental.mcp_server.slack_wrapper import send_message_to_self
+
+            (_, virtual_logging_obj) = await ProxyBaseLLMRequestProcessing(data=data).common_processing_pre_call_logic(
+                request=request,
+                user_api_key_dict=user_api_key_dict,
+                proxy_config=proxy_config,
+                route_type=CallTypes.call_mcp_tool.value,
+                proxy_logging_obj=proxy_logging_obj,
+                general_settings=general_settings,
+            )
+            _tool_start_time: Final = datetime.now()
+            result: Final = CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=await send_message_to_self(
+                            message=str(tool_arguments.get("message", "")),
+                            user_api_key_auth=user_api_key_dict,
+                            mcp_auth_header=virtual_mcp_auth_header,
+                            mcp_server_auth_headers=virtual_mcp_server_auth_headers,
+                            oauth2_headers=virtual_oauth2_headers,
+                            raw_headers=virtual_raw_headers,
+                            client_ip=rest_client_ip,
+                        ),
+                    )
+                ],
+                isError=False,
+            )
+            return await _safe_fire_mcp_tool_call_logging(
+                virtual_logging_obj,
+                result,
+                _tool_start_time,
+                datetime.now(),
+                user_api_key_auth=user_api_key_dict,
+                request_data=data,
             )
         # MCP_TOOL_CALL_TOOL_NAME: run the same pre-call pipeline as the normal path so the tool
         # execution is spend-logged and guardrail-checked.
@@ -735,6 +779,10 @@ if MCP_AVAILABLE:
         from litellm.proxy._experimental.mcp_server.auth.user_api_key_auth_mcp import (
             MCPRequestHandler,
         )
+        from litellm.proxy._experimental.mcp_server.slack_wrapper import SLACK_SERVER_NAME
+        from litellm.proxy._experimental.mcp_server.tool_search import (
+            get_slack_message_self_tool_definition,
+        )
 
         try:
             mcp_server_name = _as_query_str(mcp_server_name)
@@ -874,6 +922,34 @@ if MCP_AVAILABLE:
                 if errors and not list_tools_result:
                     error_message = "Failed to get tools from servers: " + "; ".join(errors)
 
+            # slack_message_self is served by LiteLLM itself, so it is appended to every listing
+            # instead of coming from an allowed_server_ids entry.
+            slack_server: Final = next(
+                (
+                    server
+                    for server in global_mcp_server_manager.get_registry().values()
+                    if normalize_server_name(server.name) == normalize_server_name(SLACK_SERVER_NAME)
+                ),
+                None,
+            )
+            slack_definition: Final = get_slack_message_self_tool_definition()
+            list_tools_result.append(
+                ListMCPToolsRestAPIResponseObject(
+                    name=slack_definition["name"],
+                    description=slack_definition["description"],
+                    inputSchema=slack_definition["inputSchema"],
+                    mcp_info=(
+                        {
+                            **(slack_server.mcp_info or {}),
+                            "server_id": slack_server.server_id,
+                            "alias": slack_server.alias,
+                        }
+                        if slack_server is not None
+                        else {"server_name": SLACK_SERVER_NAME}
+                    ),
+                )
+            )
+
             return {
                 "tools": list_tools_result,
                 "error": "partial_failure" if error_message else None,
@@ -942,9 +1018,10 @@ if MCP_AVAILABLE:
             from litellm.proxy._experimental.mcp_server.tool_search import (
                 MCP_TOOL_CALL_TOOL_NAME,
                 MCP_TOOL_SEARCH_TOOL_NAME,
+                SLACK_MESSAGE_SELF_TOOL_NAME,
             )
 
-            if tool_name in (MCP_TOOL_SEARCH_TOOL_NAME, MCP_TOOL_CALL_TOOL_NAME):
+            if tool_name in (MCP_TOOL_SEARCH_TOOL_NAME, MCP_TOOL_CALL_TOOL_NAME, SLACK_MESSAGE_SELF_TOOL_NAME):
                 return await _handle_virtual_mcp_tool(request, data, tool_name, user_api_key_dict)
 
             # Validate required parameters early

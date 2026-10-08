@@ -807,14 +807,26 @@ if MCP_AVAILABLE:
                 list_tools_log_source="mcp_protocol",
             )
             verbose_logger.info("MCP list_tools - Successfully returned %s tools", len(listing.tools))
+            # slack_message_self is served by LiteLLM itself, so it is appended to every listing
+            # instead of coming from a managed server's catalog.
+            from mcp.types import Tool as MCPProtocolTool
+
+            from litellm.proxy._experimental.mcp_server.tool_search import (
+                get_slack_message_self_tool_definition,
+            )
+
+            tools: Final = [
+                *listing.tools,
+                MCPProtocolTool.model_validate(get_slack_message_self_tool_definition()),
+            ]
             if not listing.outcomes:
-                return listing.tools
+                return tools
             outcome_meta: Final = {
                 SERVER_OUTCOMES_META_KEY: {
                     key: outcome_wire_value(outcome) for key, outcome in listing.outcomes.items()
                 }
             }
-            return ListToolsResult.model_validate({"tools": listing.tools, "_meta": outcome_meta})
+            return ListToolsResult.model_validate({"tools": tools, "_meta": outcome_meta})
         except Exception as e:
             verbose_logger.exception("Error in list_tools endpoint: %s", e)
             # Return empty list instead of failing completely
@@ -913,15 +925,17 @@ if MCP_AVAILABLE:
         from litellm.proxy._experimental.mcp_server.tool_search import (
             MCP_TOOL_CALL_TOOL_NAME,
             MCP_TOOL_SEARCH_TOOL_NAME,
+            SLACK_MESSAGE_SELF_TOOL_NAME,
             coerce_top_k,
             handle_mcp_tool_call,
             handle_mcp_tool_search,
         )
 
-        if name not in (MCP_TOOL_SEARCH_TOOL_NAME, MCP_TOOL_CALL_TOOL_NAME):
+        if name not in (MCP_TOOL_SEARCH_TOOL_NAME, MCP_TOOL_CALL_TOOL_NAME, SLACK_MESSAGE_SELF_TOOL_NAME):
             return None
 
-        if not getattr(
+        # slack_message_self is always callable; only the tool-search pair is opt-in.
+        if name != SLACK_MESSAGE_SELF_TOOL_NAME and not getattr(
             getattr(user_api_key_auth, "object_permission", None),
             "mcp_tool_search_enabled",
             False,
@@ -950,6 +964,23 @@ if MCP_AVAILABLE:
                 raw_headers=raw_headers,
             )
 
+        assert user_api_key_auth is not None  # guaranteed by the flag check above
+        if name == SLACK_MESSAGE_SELF_TOOL_NAME:
+            from mcp.types import CallToolResult as MCPCallToolResult
+            from mcp.types import TextContent as MCPTextContent
+
+            from litellm.proxy._experimental.mcp_server.slack_wrapper import send_message_to_self
+
+            wrapper_result: Final = await send_message_to_self(
+                message=str(args.get("message", "")),
+                user_api_key_auth=user_api_key_auth,
+                mcp_auth_header=mcp_auth_header,
+                mcp_server_auth_headers=mcp_server_auth_headers,
+                oauth2_headers=oauth2_headers,
+                raw_headers=raw_headers,
+                client_ip=client_ip,
+            )
+            return MCPCallToolResult(content=[MCPTextContent(type="text", text=wrapper_result)], isError=False)
         assert user_api_key_auth is not None  # guaranteed by the flag check above
         virtual_logging_obj: Final = await _build_virtual_call_logging_obj(
             name=name,
