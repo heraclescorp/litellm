@@ -1,0 +1,18 @@
+[project]
+name = "slack-self-mcp"
+version = "0.1.0"
+description = "Single-tool MCP server that messages only the authenticated Slack user"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28",
+    "mcp>=1.28,<2",
+    "starlette>=0.40",
+    "uvicorn>=0.30",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["slack_self_mcp"]
