@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 MCP_TOOL_SEARCH_TOOL_NAME: Final[str] = "mcp_tool_search"
 MCP_TOOL_CALL_TOOL_NAME: Final[str] = "mcp_tool_call"
-SLACK_MESSAGE_SELF_TOOL_NAME: Final[str] = "slack_message_self"
 
 
 def coerce_top_k(value: Any, default: int = 5) -> int:
@@ -33,23 +32,6 @@ def search_tools(query: str, tools: list[dict[str, Any]], top_k: int = 5) -> lis
 
     scored: Final = ((s, tool) for tool in tools if (s := _score(tool)) > 0)
     return [tool for _, tool in sorted(scored, key=lambda x: x[0], reverse=True)[:top_k]]
-
-
-def get_slack_message_self_tool_definition() -> dict[str, Any]:
-    return {
-        "name": SLACK_MESSAGE_SELF_TOOL_NAME,
-        "description": "Send a message only to the authenticated Slack user's direct message.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "description": "Message to send to your own Slack direct message.",
-                }
-            },
-            "required": ["message"],
-        },
-    }
 
 
 def get_virtual_tool_definitions() -> list[dict[str, Any]]:
@@ -91,7 +73,6 @@ def get_virtual_tool_definitions() -> list[dict[str, Any]]:
                 "required": ["tool_name"],
             },
         },
-        get_slack_message_self_tool_definition(),
     ]
 
 
