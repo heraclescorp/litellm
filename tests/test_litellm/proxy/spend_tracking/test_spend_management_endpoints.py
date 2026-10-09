@@ -122,6 +122,13 @@ def _reconstruct_ui_where_from_sql(sql_query, params):
                     "equals": params[int(code.group(1)) - 1],
                 }
             )
+        elif slmd := re.fullmatch(r"metadata->'spend_logs_metadata'->>\$(\d+) = \$(\d+)", cond):
+            metadata_conds.append(
+                {
+                    "path": ["spend_logs_metadata", params[int(slmd.group(1)) - 1]],
+                    "equals": params[int(slmd.group(2)) - 1],
+                }
+            )
         elif msg:
             metadata_conds.append(
                 {
@@ -676,6 +683,79 @@ async def test_ui_view_spend_logs_with_session_id(
     assert data["total"] == len(expected_request_ids)
     assert {log["request_id"] for log in data["data"]} == expected_request_ids
     assert all(session_id_query in log["session_id"] for log in data["data"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "pr_link,expected_request_ids",
+    [
+        ("heraclescorp/heracles:103799", {"req1", "req2"}),
+        ("heraclescorp/dotfiles:1234", {"req3"}),
+        ("heraclescorp/heracles:999999", set()),
+    ],
+)
+async def test_ui_view_spend_logs_with_spend_logs_metadata_filter(client, pr_link, expected_request_ids):
+    """Clients attach k/v pairs with the `x-litellm-spend-logs-metadata` header
+    (the PR link in our case); the endpoint filters the logs on one of them."""
+
+    def make_log(request_id, log_pr_link):
+        return {
+            "id": f"log-{request_id}",
+            "request_id": request_id,
+            "api_key": "sk-test-key",
+            "user": "test_user_1",
+            "spend": 0.05,
+            "startTime": datetime.datetime.now(timezone.utc).isoformat(),
+            "model": "gpt-4",
+            "metadata": {"spend_logs_metadata": {"pr_link": log_pr_link}},
+        }
+
+    mock_spend_logs = [
+        make_log("req1", "heraclescorp/heracles:103799"),
+        make_log("req2", "heraclescorp/heracles:103799"),
+        make_log("req3", "heraclescorp/dotfiles:1234"),
+    ]
+
+    def filter_by_spend_logs_metadata(where):
+        condition = where.get("metadata")
+        if condition is None or condition.get("path", [])[:1] != ["spend_logs_metadata"]:
+            return mock_spend_logs
+        key = condition["path"][1]
+        wanted = condition.get("equals")
+        return [
+            log
+            for log in mock_spend_logs
+            if log["metadata"]["spend_logs_metadata"].get(key) == wanted
+        ]
+
+    app.dependency_overrides[ps.user_api_key_auth] = lambda: UserAPIKeyAuth(
+        user_role=LitellmUserRoles.PROXY_ADMIN, user_id="admin_user"
+    )
+
+    try:
+        with patch.object(
+            ps,
+            "prisma_client",
+            make_ui_spend_logs_mock_prisma(mock_spend_logs, filter_by_spend_logs_metadata),
+        ):
+            start_date, end_date = _default_date_range()
+            response = client.get(
+                "/spend/logs/ui",
+                params={
+                    "spend_logs_metadata_key": "pr_link",
+                    "spend_logs_metadata_value": pr_link,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+                headers={"Authorization": "Bearer sk-test"},
+            )
+    finally:
+        app.dependency_overrides.pop(ps.user_api_key_auth, None)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == len(expected_request_ids)
+    assert {log["request_id"] for log in data["data"]} == expected_request_ids
 
 
 # Mock spend logs with distinct values for sorting tests.

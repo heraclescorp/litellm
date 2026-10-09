@@ -131,6 +131,17 @@ const urlParams = () => onUrlUpdate.mock.calls.at(-1)?.[0].searchParams ?? new U
 const historyModes = () => onUrlUpdate.mock.calls.map(([event]) => event.options.history);
 
 describe("RequestLogsPanel", () => {
+  it("seeds the spend-logs metadata filter from the URL", async () => {
+    respondWith([]);
+    renderPanel("spend_logs_metadata_value=heraclescorp/heracles:103799");
+
+    await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
+    expect(lastCall()?.params).toMatchObject({
+      spend_logs_metadata_key: "pr_link",
+      spend_logs_metadata_value: "heraclescorp/heracles:103799",
+    });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();

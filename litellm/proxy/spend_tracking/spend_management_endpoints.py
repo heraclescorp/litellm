@@ -2236,6 +2236,14 @@ async def ui_view_spend_logs(
     ),
     model_group: str | None = fastapi.Query(default=None, description="Filter logs by model group"),
     key_alias: str | None = fastapi.Query(default=None, description="Filter logs by key alias"),
+    spend_logs_metadata_key: str | None = fastapi.Query(
+        default=None,
+        description="Filter logs by a spend-logs metadata key (e.g. pr_link), see x-litellm-spend-logs-metadata",
+    ),
+    spend_logs_metadata_value: str | None = fastapi.Query(
+        default=None,
+        description="Value the spend_logs_metadata_key must equal (exact match)",
+    ),
     end_user: str | None = fastapi.Query(default=None, description="Filter logs by end user"),
     error_code: str | None = fastapi.Query(default=None, description="Filter logs by error code (e.g., '404', '500')"),
     error_message: str | None = fastapi.Query(
@@ -2399,6 +2407,16 @@ async def ui_view_spend_logs(
                 }
             )
 
+        # The k/v pairs clients attach with the `x-litellm-spend-logs-metadata`
+        # header, stored under metadata.spend_logs_metadata (e.g. pr_link).
+        if spend_logs_metadata_key is not None and spend_logs_metadata_value is not None:
+            metadata_filters.append(
+                {
+                    "path": ["spend_logs_metadata", spend_logs_metadata_key],
+                    "equals": spend_logs_metadata_value,
+                }
+            )
+
         if metadata_filters:
             if len(metadata_filters) == 1:
                 where_conditions["metadata"] = metadata_filters[0]
@@ -2531,6 +2549,15 @@ async def ui_view_spend_logs(
             sql_conditions.append(f"session_id LIKE ${p}")
             sql_params.append(f"%{like_escaped_session_id}%")
             p += 1
+
+        # Spend-logs metadata: the k/v pairs clients attach with the
+        # `x-litellm-spend-logs-metadata` header (e.g. pr_link). Both sides are
+        # bind parameters, so the key never reaches the SQL text.
+        if spend_logs_metadata_key is not None and spend_logs_metadata_value is not None:
+            sql_conditions.append(f"metadata->'spend_logs_metadata'->>${p} = ${p + 1}")
+            sql_params.append(spend_logs_metadata_key)
+            sql_params.append(spend_logs_metadata_value)
+            p += 2
 
         # Status filter
         if status_filter is not None:

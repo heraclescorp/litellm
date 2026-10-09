@@ -88,6 +88,11 @@ describe("useLogFilterLogic", () => {
       { id: LOG_FILTER_IDS.ERROR_CODE, value: "429", param: "error_code" },
       { id: LOG_FILTER_IDS.ERROR_MESSAGE, value: "rate limited", param: "error_message" },
       { id: LOG_FILTER_IDS.USER_ID, value: "user-9", param: "user_id" },
+      {
+        id: LOG_FILTER_IDS.SPEND_LOGS_METADATA_VALUE,
+        value: "heraclescorp/heracles:103799",
+        param: "spend_logs_metadata_value",
+      },
     ];
 
     it.each(cases)("sends $id as $param", async ({ id, value, param }) => {
@@ -95,6 +100,18 @@ describe("useLogFilterLogic", () => {
 
       await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
       expect(lastCallParams()?.params).toMatchObject({ [param]: value });
+    });
+
+    it("sends the spend-logs metadata key only alongside a value", async () => {
+      renderFilterHook({
+        columnFilters: [{ id: LOG_FILTER_IDS.SPEND_LOGS_METADATA_VALUE, value: "heraclescorp/heracles:103799" }],
+      });
+
+      await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
+      expect(lastCallParams()?.params).toMatchObject({
+        spend_logs_metadata_key: "pr_link",
+        spend_logs_metadata_value: "heraclescorp/heracles:103799",
+      });
     });
 
     it("omits params for filters that are absent, blank, or whitespace-only", async () => {

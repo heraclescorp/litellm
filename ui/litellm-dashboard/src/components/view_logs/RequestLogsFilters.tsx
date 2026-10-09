@@ -385,6 +385,14 @@ export function RequestLogsFilters({ get, set, teams, logsWindow }: RequestLogsF
         />
       </DataTableFilterField>
 
+      <DataTableFilterField label="PR link">
+        <Input
+          value={valueOf(LOG_FILTER_IDS.SPEND_LOGS_METADATA_VALUE)}
+          onChange={(event) => set(LOG_FILTER_IDS.SPEND_LOGS_METADATA_VALUE, emptyToUndefined(event.target.value))}
+          placeholder="Enter owner/repo:pr, e.g. heraclescorp/heracles:103799"
+        />
+      </DataTableFilterField>
+
       <ModelFilterField value={valueOf(LOG_FILTER_IDS.MODEL_ID)} onChange={setter(LOG_FILTER_IDS.MODEL_ID)} />
 
       <DataTableFilterField label="Public model / search tool">
