@@ -28,7 +28,7 @@ from .slack_api import DEFAULT_TIMEOUT_SECONDS, SlackApiError, send_message_to_s
 logger = logging.getLogger(__name__)
 
 MCP_MOUNT_PATH: Final[str] = "/mcp"
-MESSAGE_SELF_TOOL_NAME: Final[str] = "slack_message_self"
+MESSAGE_SELF_TOOL_NAME: Final[str] = "Slack MCP"
 MESSAGE_SELF_TOOL_DESCRIPTION: Final[str] = "Send a private Slack message only to the authenticated Slack user."
 
 _authorization_header: Final[ContextVar[str | None]] = ContextVar("slack_self_authorization", default=None)
