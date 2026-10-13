@@ -16,8 +16,9 @@ mcp_servers:
       - users:read
       - users:read.email
   slack_self:
+    alias: Slack MCP
     transport: http
-    url: os.environ/SLACK_SELF_MCP_URL
+    url: "http://127.0.0.1:8099/mcp"
     auth_type: oauth2
     oauth2_flow: authorization_code
     issuer: https://mcp.slack.com
