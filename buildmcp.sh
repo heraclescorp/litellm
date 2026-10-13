@@ -5,6 +5,7 @@ cd "$(dirname "$0")"
 
 MCP_ROOT="mcp-servers"
 BUILD_ROOT=".mcp-build"
+MCP_PYTHON_VERSION="${MCP_PYTHON_VERSION:-3.13}"
 
 MCP_DIRS=(
     "$MCP_ROOT/slack-mcp"
@@ -45,7 +46,8 @@ build_python_mcp() {
 
     mkdir -p "$artifact_dir/site-packages"
 
-    python3 -m pip install \
+    uv run --no-project --python "$MCP_PYTHON_VERSION" \
+        python -m pip install \
         --no-cache-dir \
         --target "$artifact_dir/site-packages" \
         "$mcp_dir"
