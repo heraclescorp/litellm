@@ -1,5 +1,5 @@
 mcp_servers:
-  "Slack MCP":
+  Slack:
     transport: http
     url: os.environ/SLACK_SELF_MCP_URL
     auth_type: oauth2
