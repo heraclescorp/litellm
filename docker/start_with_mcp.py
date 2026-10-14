@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Final
 
 MCP_ARTIFACT_DIR: Final = Path("/app/mcp/slack-mcp/site-packages")
-MCP_APP: Final = "slack_self_mcp.server:app"
+MCP_APP: Final = "slack_self_mcp.mcp_server:app"
 MCP_HOST: Final = "0.0.0.0"
 MCP_PORT: Final = "8000"
 MERGE_AND_START: Final = Path("/app/docker/merge_and_start.py")

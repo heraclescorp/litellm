@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir .
 EXPOSE 8000
 USER 65534:65534
 
-CMD ["uvicorn", "slack_self_mcp.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "slack_self_mcp.mcp_server:app", "--host", "0.0.0.0", "--port", "8000"]

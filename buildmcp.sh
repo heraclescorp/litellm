@@ -46,6 +46,10 @@ build_python_mcp() {
 
     mkdir -p "$artifact_dir/site-packages"
 
+    # setuptools reuses build/lib between runs, so a module deleted from the source tree
+    # would otherwise still be packaged into the artifact.
+    rm -rf "$mcp_dir/build"
+
     uv run --no-project --python "$MCP_PYTHON_VERSION" \
         python -m pip install \
         --no-cache-dir \
