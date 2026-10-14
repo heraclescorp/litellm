@@ -1,7 +1,7 @@
 mcp_servers:
   Slack:
     transport: http
-    url: os.environ/SLACK_SELF_MCP_URL
+    url: "http://127.0.0.1:8000/mcp"
     auth_type: oauth2
     oauth2_flow: authorization_code
     issuer: https://mcp.slack.com
