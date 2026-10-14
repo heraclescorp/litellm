@@ -1,11 +1,8 @@
+"""An MCP server that messages only the authenticated Slack user.
+
+LiteLLM owns the Slack OAuth grant and forwards the per-user token as
+``Authorization: Bearer ...`` on each request, so this package stores no credential and
+never accepts a recipient from the caller. Start it with ``slack_self_mcp.mcp_server:app``.
+"""
+
 from __future__ import annotations
-
-from .server import MESSAGE_SELF_TOOL_NAME, app, bearer_token, run_message_self, tool_definition
-
-__all__ = [
-    "MESSAGE_SELF_TOOL_NAME",
-    "app",
-    "bearer_token",
-    "run_message_self",
-    "tool_definition",
-]
