@@ -1,24 +1,7 @@
 mcp_servers:
-  slack:
+  "Slack MCP":
     transport: http
-    url: https://mcp.slack.com/mcp
-    auth_type: oauth2
-    oauth2_flow: authorization_code
-    issuer: https://mcp.slack.com
-    authorization_url: https://slack.com/oauth/v2_user/authorize
-    token_url: https://slack.com/api/oauth.v2.user.access
-    token_endpoint_auth_method: client_secret_post
-    client_id: os.environ/SLACK_CLIENT_ID
-    client_secret: os.environ/SLACK_CLIENT_SECRET
-    scopes:
-      - chat:write
-      - im:write
-      - users:read
-      - users:read.email
-  slack_self:
-    alias: Slack MCP
-    transport: http
-    url: "http://127.0.0.1:8099/mcp"
+    url: os.environ/SLACK_SELF_MCP_URL
     auth_type: oauth2
     oauth2_flow: authorization_code
     issuer: https://mcp.slack.com
