@@ -791,6 +791,41 @@ def test_responses_api_bridge_check_gpt_5_5_tools_plus_reasoning_routes_to_respo
     assert model_info.get("mode") == "responses"
 
 
+@pytest.mark.parametrize(
+    ("model_name", "reasoning_effort"),
+    [("gpt-6.1-sol", None), ("gpt-6.1-sol", "low"), ("gpt-6-sol", None), ("gpt-6-sol", "medium")],
+)
+def test_responses_api_bridge_check_gpt_6_tools_plus_reasoning_routes_to_responses(model_name, reasoning_effort):
+    from litellm.main import responses_api_bridge_check
+
+    with patch("litellm.main._get_model_info_helper") as mock_get_model_info:
+        mock_get_model_info.return_value = {"max_tokens": 128000}
+        model_info, model = responses_api_bridge_check(
+            model=model_name,
+            custom_llm_provider="openai",
+            tools=[{"type": "function", "function": {"name": "get_capital"}}],
+            reasoning_effort=reasoning_effort,
+        )
+
+    assert model == model_name
+    assert model_info.get("mode") == "responses"
+
+
+def test_responses_api_bridge_check_gpt_6_tools_with_reasoning_none_stays_on_chat():
+    from litellm.main import responses_api_bridge_check
+
+    with patch("litellm.main._get_model_info_helper") as mock_get_model_info:
+        mock_get_model_info.return_value = {"max_tokens": 128000}
+        model_info, _ = responses_api_bridge_check(
+            model="gpt-6-sol",
+            custom_llm_provider="openai",
+            tools=[{"type": "function", "function": {"name": "get_capital"}}],
+            reasoning_effort="none",
+        )
+
+    assert model_info.get("mode") != "responses"
+
+
 def test_responses_api_bridge_check_azure_gpt_5_4_tools_plus_reasoning_routes_to_responses():
     """Azure gpt-5.4 with both tools and reasoning_effort should route to Responses API."""
     from litellm.main import responses_api_bridge_check
