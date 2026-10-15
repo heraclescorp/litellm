@@ -1,28 +1,15 @@
 mcp_servers:
-  google_drive:
-    transport: stdio
-    command: /usr/bin/node
-    args:
-      - /app/mcp/google-drive-mcp/dist/index.js
-    env:
-      GOOGLE_DRIVE_MCP_CLIENT_ID: os.environ/GOOGLE_DRIVE_MCP_CLIENT_ID
-      GOOGLE_DRIVE_MCP_CLIENT_SECRET: os.environ/GOOGLE_DRIVE_MCP_CLIENT_SECRET
-      GOOGLE_DRIVE_MCP_ACCESS_TOKEN: os.environ/GOOGLE_DRIVE_MCP_ACCESS_TOKEN
-      GOOGLE_DRIVE_MCP_REFRESH_TOKEN: os.environ/GOOGLE_DRIVE_MCP_REFRESH_TOKEN
-    allowed_tools:
-      - search
-      - listFolder
-      - createFolder
-      - createTextFile
-      - readTextFile
-      - copyFile
-      - getFileMetadata
-      - readGoogleDoc
-      - createGoogleDoc
-      - getGoogleDocContent
-      - appendToDoc
-      - insertTextInDoc
-      - readGoogleSheet
-      - createGoogleSheet
-      - getGoogleSheetContent
-      - createGoogleSlides
+  Slack:
+    transport: http
+    url: "http://127.0.0.1:8000/mcp"
+    auth_type: oauth2
+    oauth2_flow: authorization_code
+    issuer: https://mcp.slack.com
+    client_id: os.environ/SLACK_CLIENT_ID
+    client_secret: os.environ/SLACK_CLIENT_SECRET
+    scopes:
+      - chat:write
+      - im:write
+      - users:read
+    available_on_public_internet: false
+    allow_all_keys: false
