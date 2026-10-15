@@ -51,20 +51,21 @@ Gating uses the standard MCP mechanisms: `allowed_tools`, `mcp_tool_permissions`
 
 ## Build and run
 
-`buildmcp.sh` (invoked by `deploy.sh`) packages this server into `.mcp-build/slack-mcp/`, and
-`aven.Dockerfile` copies `.mcp-build/` into the LiteLLM image at `/app/mcp/`.
+`buildmcp.sh` (invoked by `deploy.sh`) packages locked Linux artifacts for each deployed image
+architecture, and `aven.Dockerfile` copies the matching artifact into the LiteLLM image:
 
 ```bash
 ./buildmcp.sh
-# → .mcp-build/slack-mcp/site-packages/{slack_self_mcp,uvicorn,...}
+# .mcp-build/slack-mcp/{amd64,arm64}/site-packages/{slack_self_mcp,uvicorn,...}
 ```
 
-The artifact is a relocatable dependency tree, not a virtualenv, so it is run with the
-consuming image's interpreter and `PYTHONPATH`:
+The dependency trees are relocatable, not virtual environments. Each tree contains native
+extensions compiled for its target Linux architecture and is run with the consuming image's
+interpreter and `PYTHONPATH`:
 
 ```bash
 PYTHONPATH=/app/mcp/slack-mcp/site-packages \
-  python3 -m uvicorn slack_self_mcp.server:app --host 0.0.0.0 --port 8000
+  python3 -m uvicorn slack_self_mcp.mcp_server:app --host 0.0.0.0 --port 8000
 ```
 
 Requires Python >= 3.12 in the consuming image. In the LiteLLM image that means running it as

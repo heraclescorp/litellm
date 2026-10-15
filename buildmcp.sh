@@ -6,6 +6,10 @@ cd "$(dirname "$0")"
 MCP_ROOT="mcp-servers"
 BUILD_ROOT=".mcp-build"
 MCP_PYTHON_VERSION="${MCP_PYTHON_VERSION:-3.13}"
+MCP_PYTHON_TARGETS=(
+    "amd64:x86_64-manylinux_2_17"
+    "arm64:aarch64-manylinux_2_17"
+)
 
 MCP_DIRS=(
     "$MCP_ROOT/slack-mcp"
@@ -43,18 +47,40 @@ build_node_mcp() {
 build_python_mcp() {
     local mcp_dir="$1"
     local artifact_dir="$2"
+    local requirements_file="$BUILD_ROOT/$(basename "$mcp_dir")-requirements.txt"
 
-    mkdir -p "$artifact_dir/site-packages"
+    uv export \
+        --project "$mcp_dir" \
+        --frozen \
+        --no-dev \
+        --quiet \
+        --no-emit-project \
+        --output-file "$requirements_file"
 
-    # setuptools reuses build/lib between runs, so a module deleted from the source tree
-    # would otherwise still be packaged into the artifact.
-    rm -rf "$mcp_dir/build"
+    for python_target in "${MCP_PYTHON_TARGETS[@]}"; do
+        local target_arch="${python_target%%:*}"
+        local target_platform="${python_target#*:}"
+        local site_packages="$artifact_dir/$target_arch/site-packages"
 
-    uv run --no-project --python "$MCP_PYTHON_VERSION" \
-        python -m pip install \
-        --no-cache-dir \
-        --target "$artifact_dir/site-packages" \
-        "$mcp_dir"
+        mkdir -p "$site_packages"
+        rm -rf "$mcp_dir/build"
+
+        uv pip install \
+            --python-version "$MCP_PYTHON_VERSION" \
+            --python-platform "$target_platform" \
+            --no-cache-dir \
+            --target "$site_packages" \
+            --requirements "$requirements_file"
+        uv pip install \
+            --python-version "$MCP_PYTHON_VERSION" \
+            --python-platform "$target_platform" \
+            --no-cache-dir \
+            --no-deps \
+            --target "$site_packages" \
+            "$mcp_dir"
+    done
+
+    rm "$requirements_file"
 }
 
 for mcp_dir in "${MCP_DIRS[@]}"; do
