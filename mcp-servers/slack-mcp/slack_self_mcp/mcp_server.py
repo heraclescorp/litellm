@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any, Final
 
 import httpx
@@ -24,6 +26,8 @@ from starlette.routing import Route
 from starlette.types import Receive, Scope, Send
 
 from .auth import CaptureAuthorization, current_bearer_token
+from .channel_filter import ChannelAllowlist
+from .query_scope import DEFAULT_MAX_SCOPE_CHANNELS
 from .slack_tools import (
     DEFAULT_TIMEOUT_SECONDS,
     MESSAGE_SELF_ARGUMENT,
@@ -32,17 +36,71 @@ from .slack_tools import (
     SlackTools,
     tool_definitions,
 )
+from .upstream import (
+    DEFAULT_RESULT_FILTERED_TOOLS,
+    NO_CREDENTIAL_MESSAGE,
+    UpstreamProxy,
+    error_result,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _configure_logging() -> None:
+    """Surface this server's own INFO lines; the root logger stays at uvicorn's default."""
+    if logger.handlers:
+        return
+    handler: Final = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
 
 MCP_MOUNT_PATH: Final[str] = "/mcp"
 SERVER_NAME: Final[str] = "slack-self"
 SERVER_VERSION: Final[str] = "0.1.0"
-NO_CREDENTIAL_MESSAGE: Final[str] = "No Slack credential was forwarded for this request."
+UPSTREAM_URL_ENV: Final[str] = "SLACK_MCP_UPSTREAM_URL"
+CHANNELS_FILE_ENV: Final[str] = "SLACK_MCP_CHANNELS_FILE"
+ALLOWED_WITHOUT_CHANNEL_ENV: Final[str] = "SLACK_MCP_ALLOWED_WITHOUT_CHANNEL"
+FILTERED_RESULT_TOOLS_ENV: Final[str] = "SLACK_MCP_FILTERED_RESULT_TOOLS"
+MAX_SCOPE_CHANNELS_ENV: Final[str] = "SLACK_MCP_MAX_SCOPE_CHANNELS"
+PACKAGE_CHANNELS_FILE: Final = Path(__file__).resolve().parent.parent / "channels.txt"
 
 
-def error_result(message: str) -> CallToolResult:
-    return CallToolResult(content=[TextContent(type="text", text=message)], isError=True)
+def upstream_proxy_from_env() -> UpstreamProxy | None:
+    """The channel-filtered upstream proxy, when one is configured.
+
+    A configured upstream with an unusable allowlist raises at startup: serving without
+    the filter would hand every Slack channel to whoever holds a token.
+    """
+    upstream_url: Final = os.environ.get(UPSTREAM_URL_ENV, "").strip()
+    if not upstream_url:
+        return None
+
+    channels_file: Final = os.environ.get(CHANNELS_FILE_ENV, "").strip() or str(PACKAGE_CHANNELS_FILE)
+    allowed_without_channel: Final = frozenset(
+        name.strip() for name in os.environ.get(ALLOWED_WITHOUT_CHANNEL_ENV, "").split(",") if name.strip()
+    )
+    filtered_result_tools: Final = frozenset(
+        name.strip()
+        for name in os.environ.get(FILTERED_RESULT_TOOLS_ENV, ",".join(DEFAULT_RESULT_FILTERED_TOOLS)).split(",")
+        if name.strip()
+    )
+
+    proxy: Final = UpstreamProxy(
+        url=upstream_url,
+        allowlist=ChannelAllowlist.from_file(channels_file),
+        tools_allowed_without_channel=allowed_without_channel,
+        result_filtered_tools=filtered_result_tools,
+        max_scope_channels=int(os.environ.get(MAX_SCOPE_CHANNELS_ENV, DEFAULT_MAX_SCOPE_CHANNELS)),
+    )
+    logger.info(
+        "Proxying MCP upstream %s with %d channel IDs and %d channel names allowlisted",
+        upstream_url,
+        len(proxy.allowlist.channel_ids),
+        len(proxy.allowlist.channel_names),
+    )
+    return proxy
 
 
 async def run_message_self(
@@ -72,23 +130,38 @@ async def run_message_self(
     return CallToolResult(content=[TextContent(type="text", text=result_text)], isError=False)
 
 
-def build_mcp_server() -> Server:
+def build_mcp_server(proxy: UpstreamProxy | None = None) -> Server:
+    """The MCP server. ``proxy`` adds the channel-filtered upstream tools to this one."""
     server: Final = Server(name=SERVER_NAME, version=SERVER_VERSION)
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
-        return tool_definitions()
+        tools: Final = tool_definitions()
+        if proxy is not None:
+            try:
+                tools.extend(await proxy.list_tools(current_bearer_token()))
+            except Exception as exc:
+                logger.warning("Could not list upstream MCP tools: %s", exc)
+        return tools
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict[str, Any] | None) -> CallToolResult:
-        if name != MESSAGE_SELF_TOOL_NAME:
-            return error_result(f"Unknown tool: {name}")
-
         args: Final = arguments or {}
-        return await run_message_self(
-            message=str(args.get(MESSAGE_SELF_ARGUMENT, "")),
-            token=current_bearer_token(),
-        )
+
+        if name == MESSAGE_SELF_TOOL_NAME:
+            return await run_message_self(
+                message=str(args.get(MESSAGE_SELF_ARGUMENT, "")),
+                token=current_bearer_token(),
+            )
+
+        if proxy is not None:
+            try:
+                return await proxy.call_tool(name, args, current_bearer_token())
+            except Exception as exc:
+                logger.warning("Upstream MCP call %s failed: %s", name, exc)
+                return error_result(f"Upstream MCP call failed: {exc}")
+
+        return error_result(f"Unknown tool: {name}")
 
     return server
 
@@ -112,7 +185,11 @@ class McpAsgiApp:
 
 
 def build_app() -> Starlette:
-    session_manager: Final = StreamableHTTPSessionManager(app=build_mcp_server(), stateless=True)
+    _configure_logging()
+    session_manager: Final = StreamableHTTPSessionManager(
+        app=build_mcp_server(upstream_proxy_from_env()),
+        stateless=True,
+    )
 
     @contextlib.asynccontextmanager
     async def lifespan(_: Starlette) -> AsyncIterator[None]:
