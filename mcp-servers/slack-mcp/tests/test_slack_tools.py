@@ -20,7 +20,36 @@ IDENTITY = {"ok": True, "user_id": "U_SELF", "url": "https://example.slack.com/"
 @contextlib.asynccontextmanager
 async def _tools(handler: Callable[[httpx.Request], httpx.Response]) -> AsyncIterator[SlackTools]:
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        yield SlackTools(token="xoxp-token", client=client)
+        yield SlackTools(token="xoxp-token", client=client, bot_token="xoxb-bot")
+
+
+@pytest.mark.asyncio
+async def test_the_bot_sends_while_the_user_token_names_the_recipient() -> None:
+    seen: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.path, request.headers["authorization"]))
+        if request.url.path.endswith("auth.test"):
+            return httpx.Response(200, json=IDENTITY)
+        return httpx.Response(200, json={"ok": True, "channel": "D_SELF", "ts": "1791498863.717709"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await SlackTools(token="xoxp-user", client=client, bot_token="xoxb-bot").message_self("hello")
+
+    assert seen == [
+        ("/api/auth.test", "Bearer xoxp-user"),
+        ("/api/chat.postMessage", "Bearer xoxb-bot"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_missing_bot_credential_is_an_error_and_posts_nothing() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        raise AssertionError("Slack must not be called without a bot credential")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(ValueError, match="SLACK_BOT_TOKEN"):
+            await SlackTools(token="xoxp-user", client=client, bot_token="").message_self("hello")
 
 
 def test_tool_schema_exposes_only_message() -> None:

@@ -63,6 +63,7 @@ CHANNELS_FILE_ENV: Final[str] = "SLACK_MCP_CHANNELS_FILE"
 SEARCH_TOOLS_ENV: Final[str] = "SLACK_MCP_SEARCH_TOOLS"
 ALLOWED_WITHOUT_CHANNEL_ENV: Final[str] = "SLACK_MCP_ALLOWED_WITHOUT_CHANNEL"
 PACKAGE_CHANNELS_FILE: Final = Path(__file__).resolve().parent.parent / "channels.txt"
+BOT_TOKEN_ENV: Final[str] = "SLACK_BOT_TOKEN"
 
 
 def _name_set(env_name: str, default: frozenset[str]) -> frozenset[str]:
@@ -108,8 +109,13 @@ async def run_message_self(
         return error_result(NO_CREDENTIAL_MESSAGE)
 
     active_client: Final = client if client is not None else httpx.AsyncClient(timeout=DEFAULT_TIMEOUT_SECONDS)
+    bot_token: Final = os.environ.get(BOT_TOKEN_ENV, "").strip()
     try:
-        result_text: Final = await SlackTools(token=token, client=active_client).message_self(message)
+        result_text: Final = await SlackTools(
+            token=token,
+            client=active_client,
+            bot_token=bot_token,
+        ).message_self(message)
     except ValueError as exc:
         return error_result(str(exc))
     except SlackApiError as exc:
