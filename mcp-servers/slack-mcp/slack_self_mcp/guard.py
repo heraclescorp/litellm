@@ -37,7 +37,7 @@ CHANNEL_ID_PATTERN: Final = re.compile(r"^[CG][A-Z0-9]{6,}$")
 IN_CLAUSE: Final = re.compile(r"\bin:(?P<channel>#[A-Za-z0-9_.\-]+|[A-Za-z0-9_.\-]+)", re.IGNORECASE)
 
 DEFAULT_CHANNEL_ARGUMENTS: Final = ("channel", "channel_id", "channels", "channel_ids")
-DEFAULT_SEARCH_TOOLS: Final = frozenset({"slack_search_public", "slack_search_public_and_private"})
+DEFAULT_SEARCH_TOOLS: Final = frozenset({"slack_search_public"})
 NO_CREDENTIAL_MESSAGE: Final = "No Slack credential was forwarded for this request."
 DEFAULT_UPSTREAM_TIMEOUT_SECONDS: Final = 30.0
 SCOPE_WARNING_CHANNELS: Final = 150
