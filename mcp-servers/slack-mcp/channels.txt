@@ -90,3 +90,4 @@ C0AQFQD0FNY  #agent-assist-extension
 C0AQUBJADKL  #atp-eng
 C0AS8CX164E  #btc-bugbash
 C0BCD47TSV8  #tls-heloc-appraisals
+C01BETH12US  #notary-team
