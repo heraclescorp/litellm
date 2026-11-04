@@ -38,6 +38,7 @@ IN_CLAUSE: Final = re.compile(r"\bin:(?P<channel>#[A-Za-z0-9_.\-]+|[A-Za-z0-9_.\
 
 DEFAULT_CHANNEL_ARGUMENTS: Final = ("channel", "channel_id", "channels", "channel_ids")
 DEFAULT_SEARCH_TOOLS: Final = frozenset({"slack_search_public"})
+DEFAULT_ALLOWED_WITHOUT_CHANNEL: Final = frozenset()
 NO_CREDENTIAL_MESSAGE: Final = "No Slack credential was forwarded for this request."
 DEFAULT_UPSTREAM_TIMEOUT_SECONDS: Final = 30.0
 SCOPE_WARNING_CHANNELS: Final = 150
@@ -207,6 +208,7 @@ class UpstreamProxy:
     allowlist: ChannelAllowlist
     channel_argument_names: Sequence[str] = DEFAULT_CHANNEL_ARGUMENTS
     search_tools: frozenset[str] = DEFAULT_SEARCH_TOOLS
+    allowed_without_channel: frozenset[str] = DEFAULT_ALLOWED_WITHOUT_CHANNEL
     timeout_seconds: float = DEFAULT_UPSTREAM_TIMEOUT_SECONDS
     session_factory: SessionFactory | None = field(default=None, repr=False, compare=False)
 
@@ -255,13 +257,15 @@ class UpstreamProxy:
             return f"{name} was blocked: channel argument(s) {sorted(malformed)} did not carry channel names or IDs."
 
         if not values:
-            # A channel search names no channel by construction: it is scoped instead.
-            if name in self.search_tools:
+            # A channel search names no channel by construction: it is scoped instead. A tool
+            # the operator has declared out of scope (an opaque object ID, no enumeration) may
+            # run as-is, bounded by Slack's own ACLs.
+            if name in self.search_tools or name in self.allowed_without_channel:
                 return None
             return (
                 f"{name} was blocked: the call named no channel, and only allowlisted channels "
-                "may be read. Add the tool to the server's allowed-without-channel list if it "
-                "does not target a channel."
+                "may be read. Add the tool to SLACK_MCP_ALLOWED_WITHOUT_CHANNEL if it neither "
+                "targets nor enumerates channels."
             )
 
         disallowed: Final = sorted({value for value in values if not self.allowlist.allows(value)})

@@ -190,6 +190,16 @@ async def test_a_search_tool_may_run_without_naming_a_channel() -> None:
     assert upstream.calls_for(SEARCH_TOOL) == [{"query": "deploy in:#eng-team in:#general"}]
 
 
+async def test_an_exempted_tool_may_run_without_naming_a_channel() -> None:
+    upstream = FakeUpstream()
+    proxy = _proxy(upstream, allowed_without_channel=frozenset({"slack_read_file"}))
+
+    result = await _call_tool(proxy, "slack_read_file", {"file_id": "F090A3EM0DB"})
+
+    assert result.isError is False
+    assert upstream.calls_for("slack_read_file") == [{"file_id": "F090A3EM0DB"}]
+
+
 async def test_a_non_search_tool_that_names_no_channel_is_blocked() -> None:
     upstream = FakeUpstream()
 

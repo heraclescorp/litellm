@@ -61,6 +61,7 @@ SERVER_VERSION: Final[str] = "0.1.0"
 UPSTREAM_URL_ENV: Final[str] = "SLACK_MCP_UPSTREAM_URL"
 CHANNELS_FILE_ENV: Final[str] = "SLACK_MCP_CHANNELS_FILE"
 SEARCH_TOOLS_ENV: Final[str] = "SLACK_MCP_SEARCH_TOOLS"
+ALLOWED_WITHOUT_CHANNEL_ENV: Final[str] = "SLACK_MCP_ALLOWED_WITHOUT_CHANNEL"
 PACKAGE_CHANNELS_FILE: Final = Path(__file__).resolve().parent.parent / "channels.txt"
 
 
@@ -86,6 +87,7 @@ def upstream_proxy_from_env() -> UpstreamProxy | None:
         url=upstream_url,
         allowlist=ChannelAllowlist.from_file(channels_file),
         search_tools=_name_set(SEARCH_TOOLS_ENV, DEFAULT_SEARCH_TOOLS),
+        allowed_without_channel=_name_set(ALLOWED_WITHOUT_CHANNEL_ENV, frozenset()),
     )
     logger.info(
         "Proxying MCP upstream %s with %d channel IDs and %d channel names allowlisted",

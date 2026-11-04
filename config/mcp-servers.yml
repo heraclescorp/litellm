@@ -13,3 +13,11 @@ mcp_servers:
       - users:read
     available_on_public_internet: false
     allow_all_keys: false
+    allowed_tools:
+      - slack_search_public
+      - slack_read_channel
+      - slack_read_thread
+      - slack_list_channel_members
+      - slack_read_file
+      - slack_search_users
+      - slack_message_self
