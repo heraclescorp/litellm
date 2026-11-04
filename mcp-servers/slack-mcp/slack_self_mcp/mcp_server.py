@@ -26,8 +26,13 @@ from starlette.routing import Route
 from starlette.types import Receive, Scope, Send
 
 from .auth import CaptureAuthorization, current_bearer_token
-from .channel_filter import ChannelAllowlist
-from .query_scope import DEFAULT_MAX_SCOPE_CHANNELS
+from .guard import (
+    DEFAULT_SEARCH_TOOLS,
+    NO_CREDENTIAL_MESSAGE,
+    ChannelAllowlist,
+    UpstreamProxy,
+    error_result,
+)
 from .slack_tools import (
     DEFAULT_TIMEOUT_SECONDS,
     MESSAGE_SELF_ARGUMENT,
@@ -35,12 +40,6 @@ from .slack_tools import (
     SlackApiError,
     SlackTools,
     tool_definitions,
-)
-from .upstream import (
-    DEFAULT_RESULT_FILTERED_TOOLS,
-    NO_CREDENTIAL_MESSAGE,
-    UpstreamProxy,
-    error_result,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,10 +60,15 @@ SERVER_NAME: Final[str] = "slack-self"
 SERVER_VERSION: Final[str] = "0.1.0"
 UPSTREAM_URL_ENV: Final[str] = "SLACK_MCP_UPSTREAM_URL"
 CHANNELS_FILE_ENV: Final[str] = "SLACK_MCP_CHANNELS_FILE"
-ALLOWED_WITHOUT_CHANNEL_ENV: Final[str] = "SLACK_MCP_ALLOWED_WITHOUT_CHANNEL"
-FILTERED_RESULT_TOOLS_ENV: Final[str] = "SLACK_MCP_FILTERED_RESULT_TOOLS"
-MAX_SCOPE_CHANNELS_ENV: Final[str] = "SLACK_MCP_MAX_SCOPE_CHANNELS"
+SEARCH_TOOLS_ENV: Final[str] = "SLACK_MCP_SEARCH_TOOLS"
 PACKAGE_CHANNELS_FILE: Final = Path(__file__).resolve().parent.parent / "channels.txt"
+
+
+def _name_set(env_name: str, default: frozenset[str]) -> frozenset[str]:
+    raw: Final = os.environ.get(env_name)
+    if raw is None:
+        return default
+    return frozenset(name.strip() for name in raw.split(",") if name.strip())
 
 
 def upstream_proxy_from_env() -> UpstreamProxy | None:
@@ -78,21 +82,10 @@ def upstream_proxy_from_env() -> UpstreamProxy | None:
         return None
 
     channels_file: Final = os.environ.get(CHANNELS_FILE_ENV, "").strip() or str(PACKAGE_CHANNELS_FILE)
-    allowed_without_channel: Final = frozenset(
-        name.strip() for name in os.environ.get(ALLOWED_WITHOUT_CHANNEL_ENV, "").split(",") if name.strip()
-    )
-    filtered_result_tools: Final = frozenset(
-        name.strip()
-        for name in os.environ.get(FILTERED_RESULT_TOOLS_ENV, ",".join(DEFAULT_RESULT_FILTERED_TOOLS)).split(",")
-        if name.strip()
-    )
-
     proxy: Final = UpstreamProxy(
         url=upstream_url,
         allowlist=ChannelAllowlist.from_file(channels_file),
-        tools_allowed_without_channel=allowed_without_channel,
-        result_filtered_tools=filtered_result_tools,
-        max_scope_channels=int(os.environ.get(MAX_SCOPE_CHANNELS_ENV, DEFAULT_MAX_SCOPE_CHANNELS)),
+        search_tools=_name_set(SEARCH_TOOLS_ENV, DEFAULT_SEARCH_TOOLS),
     )
     logger.info(
         "Proxying MCP upstream %s with %d channel IDs and %d channel names allowlisted",
