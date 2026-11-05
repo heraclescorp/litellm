@@ -14,10 +14,14 @@ import httpx
 from mcp.types import Tool
 
 SLACK_API_BASE_URL: Final[str] = "https://slack.com/api"
+BOT_TOKEN_ENV: Final[str] = "SLACK_BOT_TOKEN"
 DEFAULT_TIMEOUT_SECONDS: Final[float] = 15.0
 
 MESSAGE_SELF_TOOL_NAME: Final[str] = "slack_message_self"
-MESSAGE_SELF_TOOL_DESCRIPTION: Final[str] = "Send a private Slack message only to the authenticated Slack user."
+MESSAGE_SELF_TOOL_DESCRIPTION: Final[str] = (
+    "Send the requesting user a private Slack direct message from the MCP bot. "
+    "The recipient is always the caller; it cannot be chosen."
+)
 MESSAGE_SELF_ARGUMENT: Final[str] = "message"
 MESSAGE_SELF_ARGUMENT_DESCRIPTION: Final[str] = "Message to send to your own Slack direct message."
 
@@ -75,19 +79,23 @@ class SlackTools:
     or ``ValueError`` on an invalid argument.
     """
 
-    def __init__(self, token: str, client: httpx.AsyncClient) -> None:
+    def __init__(self, token: str, client: httpx.AsyncClient, bot_token: str) -> None:
         self._token = token
+        self._bot_token = bot_token
         self._client = client
 
     async def message_self(self, message: str) -> str:
-        """Send ``message`` to the token owner's own DM and return a JSON result string."""
+        """Send ``message`` to the caller's DM and return a JSON result string."""
         if not message.strip():
             raise ValueError("Message text is required.")
+        if not self._bot_token.strip():
+            raise ValueError(f"Slack bot credential is not configured ({BOT_TOKEN_ENV}).")
 
         user_id, workspace_url = await self._authenticated_identity()
         posted: Final = await self._call_slack_api(
             "chat.postMessage",
             {"channel": user_id, "text": message},
+            token=self._bot_token,
         )
 
         channel_id: Final = posted.get("channel")
@@ -105,10 +113,10 @@ class SlackTools:
         }
         return json.dumps(result)
 
-    async def _call_slack_api(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _call_slack_api(self, method: str, payload: dict[str, Any], token: str) -> dict[str, Any]:
         response: Final = await self._client.post(
             f"{SLACK_API_BASE_URL}/{method}",
-            headers={"Authorization": f"Bearer {self._token}"},
+            headers={"Authorization": f"Bearer {token}"},
             json=payload,
         )
         response.raise_for_status()
@@ -120,7 +128,7 @@ class SlackTools:
 
     async def _authenticated_identity(self) -> tuple[str, str]:
         """Return the token's own Slack user ID and workspace URL."""
-        identity: Final = await self._call_slack_api("auth.test", {})
+        identity: Final = await self._call_slack_api("auth.test", {}, token=self._token)
         user_id: Final = identity.get("user_id")
         if not isinstance(user_id, str) or not user_id:
             raise SlackApiError("auth.test", "missing_user_id")

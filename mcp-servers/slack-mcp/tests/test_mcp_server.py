@@ -12,6 +12,12 @@ from slack_self_mcp.slack_tools import MESSAGE_SELF_TOOL_NAME
 IDENTITY = {"ok": True, "user_id": "U_SELF", "url": "https://example.slack.com/"}
 
 
+@pytest.fixture(autouse=True)
+def _bot_credential(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The DM is posted by the bot, so every path here needs its credential configured."""
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-bot")
+
+
 def _client(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
