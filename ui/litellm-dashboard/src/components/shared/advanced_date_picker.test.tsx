@@ -180,23 +180,24 @@ describe("AdvancedDatePicker", () => {
 
   it("selects a relative range from the keyboard alone", async () => {
     const user = userEvent.setup();
-    const { container } = render(<AdvancedDatePicker value={defaultValue} onValueChange={mockOnValueChange} />);
+    const { container } = render(<AdvancedDatePicker value={defaultValue} onValueChange={mockOnValueChange} budgetResetAt="2003-11-22T00:00:00Z" />);
 
     await user.tab();
     await user.keyboard("{Enter}");
 
     const presets = Array.from(container.querySelectorAll('[data-slot="advanced-date-picker-preset"]'));
-    expect(presets).toHaveLength(5);
+    expect(presets).toHaveLength(6);
 
     await user.tab();
     expect(presets[0]).toHaveFocus();
     expect(presets[0]).toHaveAttribute("aria-pressed", "false");
 
     await user.tab();
-    expect(presets[1]).toHaveFocus();
+    await user.tab();
+    expect(presets[2]).toHaveFocus();
 
     await user.keyboard("{Enter}");
-    expect(presets[1]).toHaveAttribute("aria-pressed", "true");
+    expect(presets[2]).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Last 7 days").closest("button")).toHaveClass("bg-info/10");
   });
 
