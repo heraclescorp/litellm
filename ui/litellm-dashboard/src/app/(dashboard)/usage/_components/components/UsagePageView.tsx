@@ -472,7 +472,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
               canViewTagUsage={canViewTagUsage}
               isOrgAdmin={isOrgAdmin}
             />
-            <AdvancedDatePicker value={dateValue} onValueChange={handleDateChange} />
+            <AdvancedDatePicker value={dateValue} onValueChange={handleDateChange} budgetResetAt={currentUser?.budget_reset_at} />
           </div>
           <PaginationStatusAlerts
             isFetchingMore={paginatedResult.isFetchingMore}

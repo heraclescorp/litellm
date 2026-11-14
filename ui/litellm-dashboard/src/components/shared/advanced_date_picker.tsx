@@ -12,12 +12,13 @@ interface AdvancedDatePickerProps {
   className?: string;
   showTimeRange?: boolean;
   align?: "left" | "right";
+  budgetResetAt?: string | null;
 }
 
 interface RelativeTimeOption {
   label: string;
   shortLabel: string;
-  getValue: () => { from: Date; to: Date };
+  getValue: (budgetResetAt?: string) => { from: Date; to: Date };
 }
 
 const relativeTimeOptions: RelativeTimeOption[] = [
@@ -26,6 +27,14 @@ const relativeTimeOptions: RelativeTimeOption[] = [
     shortLabel: "today",
     getValue: () => ({
       from: moment().startOf("day").toDate(),
+      to: moment().endOf("day").toDate(),
+    }),
+  },
+  {
+    label: "Week to date",
+    shortLabel: "WTD",
+    getValue: (budgetResetAt) => ({
+      from: moment(budgetResetAt).subtract(7, "days").startOf("day").toDate(),
       to: moment().endOf("day").toDate(),
     }),
   },
@@ -73,6 +82,7 @@ const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
   className,
   showTimeRange = true,
   align = "right",
+  budgetResetAt,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [tempValue, setTempValue] = useState<DateRangePickerValue>(value);
@@ -89,7 +99,7 @@ const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
     if (!currentValue.from || !currentValue.to) return null;
 
     for (const option of relativeTimeOptions) {
-      const optionRange = option.getValue();
+      const optionRange = option.getValue(budgetResetAt ?? undefined);
 
       // Compare dates with some tolerance (to account for time differences)
       const fromMatches = moment(currentValue.from).isSame(moment(optionRange.from), "day");
@@ -101,7 +111,7 @@ const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
     }
 
     return null;
-  }, []);
+  }, [budgetResetAt]);
 
   // Update selected option when value changes
   useEffect(() => {
@@ -200,7 +210,7 @@ const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
   }, []);
 
   const handleRelativeTimeSelect = (option: RelativeTimeOption) => {
-    const { from, to } = option.getValue();
+    const { from, to } = option.getValue(budgetResetAt ?? undefined);
     const newValue = { from, to };
 
     // Update local state to reflect the selection (don't apply immediately)
