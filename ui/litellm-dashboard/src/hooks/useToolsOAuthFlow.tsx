@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildMcpOAuthAuthorizeUrl, exchangeMcpOAuthToken, registerMcpOAuthClient } from "@/components/networking";
+import { startMcpOAuthAuthorization, exchangeMcpOAuthToken, registerMcpOAuthClient } from "@/components/networking";
 import { toast } from "@/lib/toast";
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { generateCodeChallenge, generateCodeVerifier } from "@/utils/pkce";
@@ -111,7 +111,7 @@ export const useToolsOAuthFlow = ({
       const state = crypto.randomUUID();
       const scopeString = scopes?.filter((s) => s.trim()).join(" ");
 
-      const authorizeUrl = buildMcpOAuthAuthorizeUrl({
+      const authorizeUrl = await startMcpOAuthAuthorization(accessToken, {
         serverId,
         clientId,
         redirectUri,
