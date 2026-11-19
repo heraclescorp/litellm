@@ -104,6 +104,52 @@ describe("loginCall - storeLoginToken integration", () => {
   });
 });
 
+describe("startMcpOAuthAuthorization", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("authenticates the authorize request and returns the provider URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ authorization_url: "https://provider.example/authorize" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const url = await Networking.startMcpOAuthAuthorization("user-key", {
+      serverId: "server-1",
+      clientId: "client-1",
+      redirectUri: "https://proxy.example/ui/mcp/oauth/callback",
+      state: "state-1",
+      codeChallenge: "challenge-1",
+    });
+
+    expect(url).toBe("https://provider.example/authorize");
+    const [requestUrl, request] = fetchMock.mock.calls[0];
+    expect(request.headers.Authorization).toBe("Bearer user-key");
+    expect(request.credentials).toBe("include");
+    expect(requestUrl).toContain("return_authorization_url=true");
+    expect(requestUrl).not.toContain("user-key");
+  });
+
+  it("rejects a denied authorization request", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: async () => JSON.stringify({ detail: "Access denied" }),
+      }),
+    );
+    await expect(
+      Networking.startMcpOAuthAuthorization("user-key", {
+        serverId: "server-1",
+        redirectUri: "https://proxy.example/ui/mcp/oauth/callback",
+        state: "state-1",
+        codeChallenge: "challenge-1",
+      }),
+    ).rejects.toThrow("Access denied");
+  });
+});
+
 describe("daily activity helpers", () => {
   const startTime = new Date("2025-02-12T00:00:00.000Z");
   const endTime = new Date("2025-02-19T00:00:00.000Z");

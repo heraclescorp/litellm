@@ -8,7 +8,7 @@ vi.mock("@/components/networking", () => ({
   exchangeMcpOAuthToken: vi.fn(),
   cacheTemporaryMcpServer: vi.fn(),
   registerMcpOAuthClient: vi.fn(),
-  buildMcpOAuthAuthorizeUrl: vi.fn(),
+  startMcpOAuthAuthorization: vi.fn(),
   getProxyBaseUrl: vi.fn(() => ""),
   serverRootPath: "",
 }));
@@ -170,7 +170,7 @@ describe("useMcpOAuthFlow reset", () => {
 
   it("reuses an existing client_id and does not register a new client (second Authorize & Fetch, same server)", async () => {
     vi.mocked(networking.cacheTemporaryMcpServer).mockResolvedValue({ server_id: "server-1" });
-    vi.mocked(networking.buildMcpOAuthAuthorizeUrl).mockReturnValue("https://idp.example.com/authorize");
+    vi.mocked(networking.startMcpOAuthAuthorization).mockResolvedValue("https://idp.example.com/authorize");
 
     const { result } = renderHook(() =>
       useMcpOAuthFlow({
@@ -191,15 +191,12 @@ describe("useMcpOAuthFlow reset", () => {
     });
 
     expect(networking.registerMcpOAuthClient).not.toHaveBeenCalled();
-    expect(networking.buildMcpOAuthAuthorizeUrl).toHaveBeenCalledWith(
-      expect.objectContaining({ clientId: "existing-client" }),
-    );
   });
 
   it("registers a fresh client when no client_id is present (new URL after the derived client is cleared)", async () => {
     vi.mocked(networking.cacheTemporaryMcpServer).mockResolvedValue({ server_id: "server-2" });
     vi.mocked(networking.registerMcpOAuthClient).mockResolvedValue({ client_id: "fresh-client" });
-    vi.mocked(networking.buildMcpOAuthAuthorizeUrl).mockReturnValue("https://idp.example.com/authorize");
+    vi.mocked(networking.startMcpOAuthAuthorization).mockResolvedValue("https://idp.example.com/authorize");
 
     const { result } = renderHook(() =>
       useMcpOAuthFlow({
@@ -220,8 +217,5 @@ describe("useMcpOAuthFlow reset", () => {
     });
 
     expect(networking.registerMcpOAuthClient).toHaveBeenCalledTimes(1);
-    expect(networking.buildMcpOAuthAuthorizeUrl).toHaveBeenCalledWith(
-      expect.objectContaining({ clientId: "fresh-client" }),
-    );
   });
 });

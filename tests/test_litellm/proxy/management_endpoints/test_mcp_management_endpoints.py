@@ -2551,57 +2551,50 @@ class TestTemporaryMCPSessionEndpoints:
             }
             assert dependency_names == {None, "user_api_key_dict"}
 
-    @pytest.mark.asyncio
-    async def test_mcp_authorize_proxies_to_discoverable_endpoint(self):
-        from litellm.proxy.management_endpoints.mcp_management_endpoints import (
-            mcp_authorize,
-        )
+    @pytest.mark.parametrize("return_authorization_url", [False, True])
+    def test_authorize_preserves_redirect_and_state_cookie(self, monkeypatch, return_authorization_url):
+        from urllib.parse import parse_qs, urlparse
 
-        request = MagicMock()
+        from litellm.proxy._experimental.mcp_server.discoverable_endpoints import (
+            _oauth_state_cookie_name,
+            decode_state_hash,
+        )
+        from litellm.proxy.management_endpoints.mcp_management_endpoints import _mcp_oauth_user_api_key_auth
+
+        monkeypatch.setenv("LITELLM_SALT_KEY", "test-salt-for-oauth")
         server = generate_mock_mcp_server_config_record(server_id="server-1")
         server.auth_type = MCPAuth.oauth2
-        authorize_response = MagicMock()
-        admin_auth = generate_mock_user_api_key_auth(
-            user_role=LitellmUserRoles.PROXY_ADMIN,
-        )
+        server.client_id = "client-1"
+        server.authorization_url = "https://provider.example/authorize"
+        server.token_url = "https://provider.example/token"
+        client = create_mcp_router_test_client()
+        client.app.dependency_overrides[_mcp_oauth_user_api_key_auth] = generate_mock_user_api_key_auth
 
-        with (
-            patch(
-                "litellm.proxy.management_endpoints.mcp_management_endpoints._get_cached_temporary_mcp_server_or_404",
-                return_value=server,
-            ) as get_server,
-            patch(
-                "litellm.proxy.management_endpoints.mcp_management_endpoints.authorize_with_server",
-                AsyncMock(return_value=authorize_response),
-            ) as authorize_mock,
+        with patch(
+            "litellm.proxy.management_endpoints.mcp_management_endpoints.get_cached_temporary_mcp_server",
+            AsyncMock(return_value=server),
         ):
-            result = await mcp_authorize(
-                request=request,
-                server_id="server-1",
-                user_api_key_dict=admin_auth,
-                client_id="client-id",
-                redirect_uri="https://example.com/callback",
-                state="state123",
-                code_challenge="challenge",
-                code_challenge_method="S256",
-                response_type="code",
-                scope="scope1",
+            response = client.get(
+                "/v1/mcp/server/oauth/server-1/authorize",
+                params={
+                    "redirect_uri": "http://localhost/ui/mcp/oauth/callback",
+                    "state": "client-state",
+                    "code_challenge": "challenge",
+                    "code_challenge_method": "S256",
+                    "return_authorization_url": str(return_authorization_url).lower(),
+                },
+                follow_redirects=False,
             )
 
-        assert result is authorize_response
-        get_server.assert_awaited_once_with("server-1", admin_auth, request=request)
-        authorize_mock.assert_awaited_once_with(
-            request=request,
-            mcp_server=server,
-            client_id="client-id",
-            redirect_uri="https://example.com/callback",
-            state="state123",
-            code_challenge="challenge",
-            code_challenge_method="S256",
-            response_type="code",
-            scope="scope1",
-            ephemeral_dcr_client=None,
-        )
+        assert response.status_code == (200 if return_authorization_url else 307)
+        location = response.json()["authorization_url"] if return_authorization_url else response.headers["location"]
+        assert urlparse(location).netloc == "provider.example"
+        relay_state = parse_qs(urlparse(location).query)["state"][0]
+        cookie_name = _oauth_state_cookie_name(relay_state)
+        assert cookie_name in response.cookies
+        assert "httponly" in response.headers["set-cookie"].lower()
+        assert decode_state_hash(response.cookies[cookie_name])["original_state"] == "client-state"
+
 
     async def _authorize_without_client_id(
         self, server, mint_mock=None, code_challenge="chal", code_challenge_method="S256"

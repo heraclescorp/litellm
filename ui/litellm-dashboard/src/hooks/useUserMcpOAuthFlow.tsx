@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  buildMcpOAuthAuthorizeUrl,
+  startMcpOAuthAuthorization,
   exchangeMcpOAuthToken,
   registerMcpOAuthClient,
   storeMCPOAuthUserCredential,
@@ -111,7 +111,7 @@ export const useUserMcpOAuthFlow = ({
       const redirectUri = buildCallbackUrl();
       const scopeString = scopes?.filter((s) => s.trim()).join(" ");
 
-      const authorizeUrl = buildMcpOAuthAuthorizeUrl({
+      const authorizeUrl = await startMcpOAuthAuthorization(accessToken, {
         serverId,
         clientId,
         redirectUri,

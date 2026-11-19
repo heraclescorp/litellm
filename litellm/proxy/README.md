@@ -31,6 +31,14 @@ print(response)
 [**See how to call Huggingface,Bedrock,TogetherAI,Anthropic, etc.**](https://docs.litellm.ai/docs/simple_proxy)
 
 
+### MCP OAuth from the dashboard
+
+The dashboard initiates MCP authorization with an authenticated request to
+`/v1/mcp/server/oauth/{server_id}/authorize?return_authorization_url=true`.
+The JSON response contains the provider URL and sets the OAuth state cookie;
+the browser must accept that cookie before navigating to the provider. Without
+the parameter, the endpoint returns the usual browser redirect.
+
 ---
 
 ### Folder Structure

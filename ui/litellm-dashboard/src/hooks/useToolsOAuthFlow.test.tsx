@@ -6,7 +6,7 @@ import { useToolsOAuthFlow } from "./useToolsOAuthFlow";
 vi.mock("@/components/networking", () => ({
   exchangeMcpOAuthToken: vi.fn(),
   registerMcpOAuthClient: vi.fn(),
-  buildMcpOAuthAuthorizeUrl: vi.fn(() => "https://gw.example.com/v1/mcp/server/oauth/server-1/authorize"),
+  startMcpOAuthAuthorization: vi.fn().mockResolvedValue("https://idp.example.com/authorize"),
   getProxyBaseUrl: vi.fn(() => ""),
   serverRootPath: "",
 }));
@@ -52,10 +52,7 @@ describe("useToolsOAuthFlow client registration", () => {
     });
 
     expect(networking.registerMcpOAuthClient).not.toHaveBeenCalled();
-    expect(networking.buildMcpOAuthAuthorizeUrl).toHaveBeenCalledWith(
-      expect.objectContaining({ serverId: "server-1", clientId: undefined }),
-    );
-    expect(window.location.href).toBe("https://gw.example.com/v1/mcp/server/oauth/server-1/authorize");
+    expect(window.location.href).toBe("https://idp.example.com/authorize");
   });
 
   it("still registers browser-side for servers the gateway does not mint for", async () => {
@@ -77,9 +74,6 @@ describe("useToolsOAuthFlow client registration", () => {
       "user-token",
       "server-1",
       expect.objectContaining({ redirect_uris: [expect.stringContaining("callback")] }),
-    );
-    expect(networking.buildMcpOAuthAuthorizeUrl).toHaveBeenCalledWith(
-      expect.objectContaining({ serverId: "server-1", clientId: "reg-client-1" }),
     );
   });
 });

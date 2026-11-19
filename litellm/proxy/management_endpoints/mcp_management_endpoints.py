@@ -35,7 +35,7 @@ from fastapi import (
     Response,
     status,
 )
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from typing_extensions import ReadOnly, TypedDict
 
 try:
@@ -1836,6 +1836,7 @@ if MCP_AVAILABLE:
         code_challenge_method: str | None = None,
         response_type: str | None = None,
         scope: str | None = None,
+        return_authorization_url: bool = False,
     ):
         mcp_server: Final = await _get_cached_temporary_mcp_server_or_404(server_id, user_api_key_dict, request=request)
         _raise_if_not_oauth2(mcp_server)
@@ -1866,7 +1867,7 @@ if MCP_AVAILABLE:
                     ),
                 },
             )
-        return await authorize_with_server(
+        authorization_response: Final = await authorize_with_server(
             request=request,
             mcp_server=mcp_server,
             client_id=resolved_client_id,
@@ -1877,7 +1878,18 @@ if MCP_AVAILABLE:
             response_type=response_type,
             scope=scope,
             ephemeral_dcr_client=ephemeral_dcr_client,
+            authenticated_user_id=user_api_key_dict.user_id if return_authorization_url else None,
         )
+        if not return_authorization_url or not isinstance(authorization_response, RedirectResponse):
+            return authorization_response
+        response: Final = JSONResponse(
+            {"authorization_url": authorization_response.headers["location"]},
+            headers={"Cache-Control": "no-store"},
+        )
+        response.raw_headers.extend(
+            (name, value) for name, value in authorization_response.raw_headers if name.lower() == b"set-cookie"
+        )
+        return response
 
     @router.post(
         "/server/oauth/{server_id}/token",
