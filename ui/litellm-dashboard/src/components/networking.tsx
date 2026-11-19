@@ -6800,31 +6800,32 @@ interface BuildOAuthAuthorizeURLParams {
   scope?: string;
 }
 
-export const buildMcpOAuthAuthorizeUrl = ({
-  serverId,
-  clientId,
-  redirectUri,
-  state,
-  codeChallenge,
-  scope,
-}: BuildOAuthAuthorizeURLParams): string => {
-  const base = getProxyBaseUrl();
+export const startMcpOAuthAuthorization = async (
+  accessToken: string,
+  { serverId, clientId, redirectUri, state, codeChallenge, scope }: BuildOAuthAuthorizeURLParams,
+): Promise<string> => {
   const normalizedServerId = encodeURIComponent(serverId.trim());
-  const url = `${base}/v1/mcp/server/oauth/${normalizedServerId}/authorize`;
-  const params = new URLSearchParams({
-    redirect_uri: redirectUri,
-    state,
-    response_type: "code",
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-  });
-  if (clientId && clientId.trim().length > 0) {
-    params.set("client_id", clientId);
+  const data = await apiClient.get<{ authorization_url?: unknown }>(
+    `/v1/mcp/server/oauth/${normalizedServerId}/authorize`,
+    {
+      accessToken,
+      credentials: "include",
+      query: {
+        redirect_uri: redirectUri,
+        state,
+        response_type: "code",
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+        return_authorization_url: true,
+        client_id: clientId?.trim() ? clientId : undefined,
+        scope: scope?.trim() ? scope : undefined,
+      },
+    },
+  );
+  if (typeof data.authorization_url !== "string" || !data.authorization_url) {
+    throw new Error("MCP authorization URL is missing");
   }
-  if (scope && scope.trim().length > 0) {
-    params.set("scope", scope);
-  }
-  return `${url}?${params.toString()}`;
+  return data.authorization_url;
 };
 
 interface ExchangeMcpOAuthTokenParams {

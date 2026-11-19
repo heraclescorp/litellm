@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "@/lib/toast";
 import {
-  buildMcpOAuthAuthorizeUrl,
+  startMcpOAuthAuthorization,
   cacheTemporaryMcpServer,
   exchangeMcpOAuthToken,
   getProxyBaseUrl,
@@ -177,7 +177,7 @@ export const useMcpOAuthFlow = ({
         ? credentials.scopes.filter((s) => s && s.trim().length > 0).join(" ")
         : undefined;
 
-      const authorizeUrl = buildMcpOAuthAuthorizeUrl({
+      const authorizeUrl = await startMcpOAuthAuthorization(accessToken, {
         serverId,
         clientId: clientId,
         redirectUri: callbackUrl(),

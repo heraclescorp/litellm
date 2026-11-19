@@ -810,6 +810,7 @@ async def authorize_with_server(
     response_type: str | None = None,
     scope: str | None = None,
     ephemeral_dcr_client: "EphemeralDcrClient | None" = None,
+    authenticated_user_id: str | None = None,
 ):
     _raise_if_not_oauth2(mcp_server)
     if mcp_server.authorization_url is None:
@@ -865,7 +866,7 @@ async def authorize_with_server(
             _user_id_from_session_cookie,
         )
 
-        litellm_user_id = _user_id_from_session_cookie(request)
+        litellm_user_id = authenticated_user_id or _user_id_from_session_cookie(request)
         if litellm_user_id is None:
             return _redirect_to_litellm_login(request)
         denial: Final = await _bridge_authorize_access_denial(

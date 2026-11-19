@@ -5245,31 +5245,34 @@ async def test_interactive_bridge_gateway_code_for_another_server_is_rejected_40
 
 
 @pytest.mark.asyncio
-async def test_interactive_bridge_authorize_seals_sso_user_into_state():
-    """On the short-circuit bridge oauth_delegate arm, authorize captures the SSO user from the UI
-    session cookie and seals it (and the target server) into the encrypted OAuth state, so the
-    callback can later mint a user-bound gateway code; it still proceeds to the upstream redirect.
-    The access gate runs for real against a granted resolver, so its interface stays exercised."""
-    from litellm.proxy._experimental.mcp_server.discoverable_endpoints import authorize_with_server
-    from litellm.proxy._experimental.mcp_server.mcp_server_manager import (
-        global_mcp_server_manager,
+@pytest.mark.parametrize(
+    ("cookie_user_id", "authenticated_user_id"),
+    [("sso-user-42", None), ("stale-user", "sso-user-42")],
+)
+async def test_interactive_bridge_authorize_seals_authenticated_user_into_state(
+    monkeypatch, cookie_user_id, authenticated_user_id
+):
+    from http.cookies import SimpleCookie
+    from urllib.parse import parse_qs, urlparse
+
+    from litellm.proxy._experimental.mcp_server.discoverable_endpoints import (
+        _oauth_state_cookie_name,
+        authorize_with_server,
+        decode_state_hash,
     )
+    from litellm.proxy._experimental.mcp_server.mcp_server_manager import global_mcp_server_manager
     from litellm.proxy._types import UserAPIKeyAuth
     from litellm.types.mcp import MCPAuth
 
+    monkeypatch.setenv("LITELLM_SALT_KEY", "test-salt-for-bridge-oauth")
     server = _bridge_server(auth_type=MCPAuth.oauth_delegate, client_id="admin-client", registration_url=None)
     admitted = UserAPIKeyAuth(user_id="sso-user-42")
     admitted.mcp_admitted_user_subject = True
-    captured: dict = {}
-
-    def _capture(**kwargs):
-        captured.update(kwargs)
-        return "mocked_encrypted_state"
 
     with (
         patch(
             "litellm.proxy._experimental.mcp_server.byok_oauth_endpoints._user_id_from_session_cookie",
-            return_value="sso-user-42",
+            return_value=cookie_user_id,
         ),
         patch(
             "litellm.proxy._experimental.mcp_server.auth.user_api_key_auth_mcp.MCPRequestHandler.reload_admitted_user",
@@ -5280,10 +5283,6 @@ async def test_interactive_bridge_authorize_seals_sso_user_into_state():
             "get_allowed_mcp_servers",
             new=AsyncMock(return_value=[server.server_id]),
         ),
-        patch(
-            "litellm.proxy._experimental.mcp_server.discoverable_endpoints.encode_state_with_base_url",
-            side_effect=_capture,
-        ),
     ):
         response = await authorize_with_server(
             request=_bridge_mock_request(),
@@ -5293,11 +5292,17 @@ async def test_interactive_bridge_authorize_seals_sso_user_into_state():
             state="s",
             code_challenge="chal",
             code_challenge_method="S256",
+            authenticated_user_id=authenticated_user_id,
         )
 
-    assert captured["litellm_user_id"] == "sso-user-42"
-    assert captured["mcp_server_id"] == server.server_id
-    assert "/sso/key/generate" not in response.headers["location"]
+    location = response.headers["location"]
+    relay_state = parse_qs(urlparse(location).query)["state"][0]
+    cookies = SimpleCookie()
+    cookies.load(response.headers["set-cookie"])
+    state = decode_state_hash(cookies[_oauth_state_cookie_name(relay_state)].value)
+    assert state["litellm_user_id"] == "sso-user-42"
+    assert state["mcp_server_id"] == server.server_id
+    assert "/sso/key/generate" not in location
 
 
 @pytest.mark.asyncio
