@@ -4974,3 +4974,56 @@ def test_completion_does_not_leak_rust_flag_into_provider_request_body():
     create_kwargs = mock_client.chat.completions.with_raw_response.create.call_args.kwargs
     assert "rust" not in create_kwargs
     assert "rust" not in (create_kwargs.get("extra_body") or {})
+
+
+@pytest.mark.parametrize("store", [True, False])
+@pytest.mark.parametrize("allowed", [[], ["store"]])
+@pytest.mark.parametrize(
+    "provider,model",
+    [
+        ("gemini", "gemini-4-argon"),
+        ("gemini", "gemini-3.8-flash"),
+        ("vertex_ai", "gemini-4-argon"),
+        ("vertex_ai_beta", "gemini-4-argon"),
+    ],
+)
+def test_gemini_chat_drops_store_without_dropping_other_params(
+    provider: str, model: str, store: bool, allowed: list[str]
+) -> None:
+    params = litellm.utils.get_optional_params(
+        model=model,
+        custom_llm_provider=provider,
+        store=store,
+        max_tokens=128,
+        drop_params=False,
+        allowed_openai_params=allowed,
+    )
+    assert "store" not in params
+    assert params["max_output_tokens"] == 128
+
+
+@pytest.mark.parametrize("store", [True, False])
+def test_non_gemini_chat_preserves_store(store: bool) -> None:
+    params = litellm.utils.get_optional_params(model="gpt-4o", custom_llm_provider="openai", store=store)
+    assert params["store"] is store
+
+
+def test_gemini_chat_still_rejects_other_unsupported_params() -> None:
+    with pytest.raises(litellm.UnsupportedParamsError, match="prompt_cache_key"):
+        litellm.utils.get_optional_params(
+            model="gemini-4-argon",
+            custom_llm_provider="gemini",
+            store=False,
+            prompt_cache_key="cache-key",
+            drop_params=False,
+        )
+
+
+def test_vertex_non_gemini_does_not_drop_store() -> None:
+    params = litellm.utils.get_optional_params(
+        model="claude-sonnet-4-5",
+        custom_llm_provider="vertex_ai",
+        store=False,
+        allowed_openai_params=["store"],
+    )
+    assert params["store"] is False
