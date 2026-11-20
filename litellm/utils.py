@@ -3988,6 +3988,10 @@ def get_optional_params(
 ):
     passed_params: Final = locals().copy()
     special_params: Final = passed_params.pop("kwargs")
+    if custom_llm_provider == "gemini" or (
+        custom_llm_provider in ("vertex_ai", "vertex_ai_beta") and "gemini" in model.lower()
+    ):
+        passed_params.pop("store", None)
     # Remove base_model from passed_params so it doesn't interfere with
     # non_default_params / _check_valid_arg — it's a routing hint, not an
     # OpenAI param.

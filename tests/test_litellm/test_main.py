@@ -2957,3 +2957,35 @@ def test_a_stream_that_reported_no_usage_is_still_billed(local_cost_map):
     assert cost == pytest.approx(
         _priced_at(rebuilt.usage.prompt_tokens, rebuilt.usage.completion_tokens)
     )
+
+
+@pytest.mark.parametrize("store", [True, False])
+def test_gemini_completion_drops_store_on_provider_request(store: bool) -> None:
+    from litellm.llms.custom_httpx.http_handler import HTTPHandler
+
+    requests = []
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [{"content": {"role": "model", "parts": [{"text": "ok"}]}, "finishReason": "STOP"}],
+                "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1, "totalTokenCount": 2},
+                "modelVersion": "gemini-4-argon",
+            },
+        )
+
+    client = HTTPHandler(client=httpx.Client(transport=httpx.MockTransport(handle_request)))
+    response = litellm.completion(
+        model="gemini/gemini-4-argon",
+        messages=[{"role": "user", "content": "hello"}],
+        store=store,
+        max_tokens=128,
+        api_key="fake-key",
+        client=client,
+    )
+    assert response.choices[0].message.content == "ok"
+    assert len(requests) == 1
+    assert "store" not in requests[0]
+    assert requests[0]["generationConfig"]["max_output_tokens"] == 128
