@@ -57,7 +57,11 @@ architecture, and `aven.Dockerfile` copies the matching artifact into the LiteLL
 ```bash
 ./buildmcp.sh
 # .mcp-build/slack-mcp/{amd64,arm64}/site-packages/{slack_self_mcp,uvicorn,...}
+# .mcp-build/figma-mcp/{dist,node_modules} (shared by both architectures)
 ```
+
+Building requires `uv`, Node.js 20.20 or later, and Corepack. The production image supplies
+Python and Node.js runtimes for the packaged servers.
 
 The dependency trees are relocatable, not virtual environments. Each tree contains native
 extensions compiled for its target Linux architecture and is run with the consuming image's
@@ -67,6 +71,11 @@ interpreter and `PYTHONPATH`:
 PYTHONPATH=/app/mcp/slack-mcp/site-packages \
   python3 -m uvicorn slack_self_mcp.mcp_server:app --host 0.0.0.0 --port 8000
 ```
+
+The image also starts Figma MCP on `127.0.0.1:3333` with image downloads disabled. Set
+`FIGMA_OAUTH_CLIENT_ID`, `FIGMA_OAUTH_CLIENT_SECRET`, and `PROXY_BASE_URL` in the deployment;
+register `<PROXY_BASE_URL>/callback` with the Figma OAuth app and grant it `file_content:read`.
+LiteLLM stores each user's OAuth token and forwards it to the local Figma process.
 
 Requires Python >= 3.12 in the consuming image. In the LiteLLM image that means running it as
 its own process with a command override, since the image entrypoint starts the proxy.
