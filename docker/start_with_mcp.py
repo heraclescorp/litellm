@@ -108,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
             figma_env: Final = {
                 key: value for key, value in os.environ.items()
                 if key not in (
-                    "FIGMA_API_KEY", "FIGMA_OAUTH_TOKEN", "FIGMA_OAUTH_CLIENT_ID", "FIGMA_OAUTH_CLIENT_SECRET"
+                    "FIGMA_API_KEY", "FIGMA_OAUTH_TOKEN", "FIGMA_CLIENT_ID", "FIGMA_CLIENT_SECRET"
                 ) and not (key == "NODE_ENV" and value == "cli")
             }
             children.append(subprocess.Popen([

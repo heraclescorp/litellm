@@ -28,8 +28,8 @@ mcp_servers:
     oauth2_flow: authorization_code
     authorization_url: https://www.figma.com/oauth
     token_url: https://api.figma.com/v1/oauth/token
-    client_id: os.environ/FIGMA_OAUTH_CLIENT_ID
-    client_secret: os.environ/FIGMA_OAUTH_CLIENT_SECRET
+    client_id: os.environ/FIGMA_CLIENT_ID
+    client_secret: os.environ/FIGMA_CLIENT_SECRET
     scopes:
       - file_content:read
     available_on_public_internet: false
