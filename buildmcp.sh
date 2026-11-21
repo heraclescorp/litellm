@@ -13,9 +13,9 @@ MCP_PYTHON_TARGETS=(
 
 MCP_DIRS=(
     "$MCP_ROOT/slack-mcp"
+    "$MCP_ROOT/figma-mcp"
 )
 
-rm -rf "$BUILD_ROOT"
 mkdir -p "$BUILD_ROOT"
 
 git submodule update --init --recursive
@@ -24,21 +24,31 @@ build_node_mcp() {
     local mcp_dir="$1"
     local artifact_dir="$2"
 
-    npm --prefix "$mcp_dir" install \
-        --include=dev \
-        --ignore-scripts \
-        --no-audit \
-        --no-fund
+    local work_dir="$BUILD_ROOT/.$(basename "$mcp_dir")-build"
 
-    npm --prefix "$mcp_dir" run build
-    npm --prefix "$mcp_dir" prune --omit=dev --ignore-scripts
+    rm -rf "$work_dir"
+    mkdir -p "$work_dir" "$artifact_dir"
+    cp "$mcp_dir"/{package.json,pnpm-lock.yaml,tsconfig.json,tsup.config.ts} "$work_dir/"
+    cp -a "$mcp_dir/src" "$work_dir/src"
 
-    mkdir -p "$artifact_dir"
+    (
+        cd "$work_dir"
+        export CI=true
+        pnpm_config=(
+            --config.node-linker=isolated
+            --config.modules-dir=node_modules
+            --config.virtual-store-dir=node_modules/.pnpm
+        )
+        corepack pnpm install "${pnpm_config[@]}" --frozen-lockfile --ignore-scripts --prod=false
+        corepack pnpm "${pnpm_config[@]}" run build
+        rm -rf node_modules
+        corepack pnpm install "${pnpm_config[@]}" --frozen-lockfile --ignore-scripts --prod
+    )
 
-    cp "$mcp_dir/package.json" "$artifact_dir/package.json"
-    cp "$mcp_dir/package-lock.json" "$artifact_dir/package-lock.json"
-    cp -a "$mcp_dir/node_modules" "$artifact_dir/node_modules"
-    cp -a "$mcp_dir/dist" "$artifact_dir/dist"
+    cp "$work_dir/package.json" "$artifact_dir/package.json"
+    cp -a "$work_dir/node_modules" "$artifact_dir/node_modules"
+    cp -a "$work_dir/dist" "$artifact_dir/dist"
+    rm -rf "$work_dir"
 }
 
 # Python MCP servers ship a relocatable dependency tree: a venv's scripts embed the
@@ -86,6 +96,7 @@ build_python_mcp() {
 for mcp_dir in "${MCP_DIRS[@]}"; do
     mcp_name="$(basename "$mcp_dir")"
     artifact_dir="$BUILD_ROOT/$mcp_name"
+    rm -rf "$artifact_dir"
 
     echo "Building $mcp_name"
 
