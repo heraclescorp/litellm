@@ -38,7 +38,7 @@ mcp_servers:
     auth_type: oauth2
     oauth2_flow: authorization_code
     # Dropbox only allows dynamic client registration for its own allowlist of clients, so the gateway presents
-    # gateway operator's own Dropbox app. token_access_type=offline is what makes Dropbox return a refresh token.
+    # the operator's own Dropbox app. token_access_type=offline is what makes Dropbox return a refresh token.
     authorization_url: https://www.dropbox.com/oauth2/authorize?token_access_type=offline
     token_url: https://api.dropboxapi.com/oauth2/token
     client_id: os.environ/DROPBOX_CLIENT_ID
