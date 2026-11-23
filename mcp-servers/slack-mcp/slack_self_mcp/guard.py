@@ -56,12 +56,14 @@ class QueryScopeError(ValueError):
 class ChannelAllowlist:
     channel_ids: frozenset[str]
     names_by_id: Mapping[str, str]
+    ids_by_name: Mapping[str, str]
     scope_clauses: str
 
     @classmethod
     def from_entries(cls, entries: Sequence[object]) -> ChannelAllowlist:
         channel_ids: set[str] = set()
         names_by_id: dict[str, str] = {}
+        ids_by_name: dict[str, str] = {}
 
         for line_number, entry in enumerate(entries, start=1):
             if not isinstance(entry, str):
@@ -87,11 +89,19 @@ class ChannelAllowlist:
                 raise ChannelAllowlistError(
                     f"Line {line_number}: {trailing!r} is not a channel name. Write it as '#name'."
                 )
-            names_by_id[channel_id] = trailing[1:].strip().casefold()
+            channel_name = trailing[1:].strip().casefold()
+            # Calls naming a channel are forwarded with its listed ID, so each name must identify one channel.
+            if channel_name in ids_by_name:
+                raise ChannelAllowlistError(
+                    f"Line {line_number}: #{channel_name} is listed for both {ids_by_name[channel_name]} and {channel_id}."
+                )
+            names_by_id[channel_id] = channel_name
+            ids_by_name[channel_name] = channel_id
 
         return cls(
             channel_ids=frozenset(channel_ids),
             names_by_id=MappingProxyType(names_by_id),
+            ids_by_name=MappingProxyType(ids_by_name),
             scope_clauses=" ".join(f"in:#{name}" for name in sorted(names_by_id.values())),
         )
 
@@ -110,14 +120,18 @@ class ChannelAllowlist:
         return frozenset(self.names_by_id.values())
 
     def allows(self, value: str) -> bool:
+        return self.channel_id_for(value) is not None
+
+    def channel_id_for(self, value: str) -> str | None:
+        """The listed ID for an allowlisted channel named by ID or name, or None when it is not listed.
+
+        Slack resolves a channel name at call time, so a renamed channel's old name can come to mean another
+        channel. Forwarding the listed ID keeps every call on the channel the allowlist approved.
+        """
         candidate: Final = value.strip()
-        if not candidate:
-            return False
-        if candidate.startswith("#"):
-            return candidate[1:].strip().casefold() in self.channel_names
         if CHANNEL_ID_PATTERN.match(candidate):
-            return candidate in self.channel_ids
-        return candidate.casefold() in self.channel_names
+            return candidate if candidate in self.channel_ids else None
+        return self.ids_by_name.get(candidate.removeprefix("#").strip().casefold())
 
     def scope(self, query: str) -> str:
         """Rewrite ``query`` so Slack only searches allowlisted channels."""
@@ -278,16 +292,34 @@ class UpstreamProxy:
         return None
 
     def _scoped_arguments(self, name: str, arguments: dict[str, object]) -> dict[str, object]:
-        """Scope a channel search to the allowlist; every other call is forwarded as-is."""
+        """Name every channel by its listed ID, and scope a channel search to the allowlist."""
+        resolved: Final = self._channel_ids_for_arguments(arguments)
         if name not in self.search_tools:
-            return arguments
-        query: Final = arguments.get("query")
+            return resolved
+        query: Final = resolved.get("query")
         if not isinstance(query, str):
-            return arguments
+            return resolved
 
         if len(self.allowlist.names_by_id) > SCOPE_WARNING_CHANNELS:
             logger.warning(
                 "Allowlist has %d named channels; the scoped query may exceed what Slack accepts",
                 len(self.allowlist.names_by_id),
             )
-        return {**arguments, "query": self.allowlist.scope(query)}
+        return {**resolved, "query": self.allowlist.scope(query)}
+
+    def _channel_ids_for_arguments(self, arguments: dict[str, object]) -> dict[str, object]:
+        """Replace each channel argument with the listed ID; rejection_reason has already allowed every value."""
+        resolved: dict[str, object] = dict(arguments)
+        for argument_name in self.channel_argument_names:
+            raw_value = arguments.get(argument_name)
+            if isinstance(raw_value, str):
+                resolved[argument_name] = self._listed_id(raw_value)
+            elif isinstance(raw_value, list):
+                resolved[argument_name] = [self._listed_id(item) for item in raw_value if isinstance(item, str)]
+        return resolved
+
+    def _listed_id(self, value: str) -> str:
+        channel_id: Final = self.allowlist.channel_id_for(value)
+        if channel_id is None:
+            raise QueryScopeError(f"channel {value!r} is not in the allowlist")
+        return channel_id
