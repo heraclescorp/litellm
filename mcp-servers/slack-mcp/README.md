@@ -54,7 +54,7 @@ Gating uses the standard MCP mechanisms: `allowed_tools`, `mcp_tool_permissions`
 LiteLLM allows four write tools from Slack's MCP server: `slack_send_message`,
 `slack_send_message_draft`, `slack_schedule_message`, and `slack_add_reaction`. They act as the
 signed-in user, through the `chat:write` and `reactions:write` user scopes in
-`config/mcp-servers.yml`.
+`config/mcp-servers.yml`. File results in `slack_search_public` use `search:read.files`.
 
 The channel allowlist applies to writes exactly as to reads. A write must name an allowlisted
 channel, or it is refused before reaching Slack. That rules out:
@@ -62,6 +62,11 @@ channel, or it is refused before reaching Slack. That rules out:
 - DMs: a user ID (`U…`) or DM ID (`D…`) is never on the allowlist;
 - channels outside `channels.txt`;
 - any call that names no channel.
+
+A call may name a channel by ID or by its name in `channels.txt`; either way the proxy forwards
+the listed ID. Slack resolves names when the call runs, so a renamed channel's old name could
+otherwise reach a different, unlisted channel. Each name in `channels.txt` must therefore
+belong to exactly one channel ID.
 
 The proxy does not post to a channel the user cannot already post to; Slack's own permissions
 still apply. Requested scopes exclude DM and group-DM access, private-channel history, new

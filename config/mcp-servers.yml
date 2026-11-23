@@ -11,6 +11,7 @@ mcp_servers:
     # channel-naming call, writes included, to channels.txt; DMs and channel creation stay off.
     scopes:
       - search:read.public
+      - search:read.files
       - search:read.users
       - channels:read
       - channels:history

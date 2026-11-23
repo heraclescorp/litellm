@@ -117,6 +117,11 @@ def test_a_duplicate_channel_id_is_rejected() -> None:
         ChannelAllowlist.from_entries([f"{GENERAL_ID} #general", f"{GENERAL_ID} #other"])
 
 
+def test_a_channel_name_listed_for_two_ids_is_rejected() -> None:
+    with pytest.raises(ChannelAllowlistError, match="#general is listed for both"):
+        ChannelAllowlist.from_entries([f"{GENERAL_ID} #general", f"{ENG_TEAM_ID} #General"])
+
+
 def test_a_missing_file_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ChannelAllowlistError, match="does not exist"):
         ChannelAllowlist.from_file(tmp_path / "absent.txt")
@@ -183,6 +188,27 @@ async def test_a_write_tool_may_post_to_an_allowlisted_channel(tool: str) -> Non
 
     assert result.isError is False
     assert upstream.calls_for(tool) == [arguments]
+
+
+@pytest.mark.parametrize("tool", ("slack_read_channel", *WRITE_TOOLS))
+@pytest.mark.parametrize("named_as", ["#eng-team", "eng-team", "#ENG-TEAM", ENG_TEAM_ID])
+async def test_a_channel_named_by_name_is_forwarded_as_its_listed_id(tool: str, named_as: str) -> None:
+    # Slack resolves names when the call runs, so a reused name could otherwise reach an unlisted channel.
+    upstream = FakeUpstream()
+
+    result = await _call_tool(_proxy(upstream), tool, {"channel_id": named_as, "message": "Deploy finished"})
+
+    assert result.isError is False
+    assert upstream.calls_for(tool) == [{"channel_id": ENG_TEAM_ID, "message": "Deploy finished"}]
+
+
+async def test_every_channel_in_a_list_argument_is_forwarded_as_its_listed_id() -> None:
+    upstream = FakeUpstream()
+
+    result = await _call_tool(_proxy(upstream), "slack_read_channel", {"channel_ids": ["#general", ENG_TEAM_ID]})
+
+    assert result.isError is False
+    assert upstream.calls_for("slack_read_channel") == [{"channel_ids": [GENERAL_ID, ENG_TEAM_ID]}]
 
 
 @pytest.mark.parametrize("tool", WRITE_TOOLS)
