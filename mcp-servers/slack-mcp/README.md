@@ -49,6 +49,25 @@ the official Slack MCP server means a second authorization.
 Gating uses the standard MCP mechanisms: `allowed_tools`, `mcp_tool_permissions`, and
 `mcp_toolsets`.
 
+## Channel posting
+
+LiteLLM allows four write tools from Slack's MCP server: `slack_send_message`,
+`slack_send_message_draft`, `slack_schedule_message`, and `slack_add_reaction`. They act as the
+signed-in user, through the `chat:write` and `reactions:write` user scopes in
+`config/mcp-servers.yml`.
+
+The channel allowlist applies to writes exactly as to reads. A write must name an allowlisted
+channel, or it is refused before reaching Slack. That rules out:
+
+- DMs: a user ID (`U…`) or DM ID (`D…`) is never on the allowlist;
+- channels outside `channels.txt`;
+- any call that names no channel.
+
+The proxy does not post to a channel the user cannot already post to; Slack's own permissions
+still apply. Requested scopes exclude DM and group-DM access, private-channel history, new
+conversations, canvases, lists, and file uploads. Users who authorized Slack before a scope
+was added must reconnect Slack in LiteLLM to grant it.
+
 ## Build and run
 
 `buildmcp.sh` (invoked by `deploy.sh`) packages locked Linux artifacts for each deployed image

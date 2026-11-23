@@ -171,6 +171,51 @@ async def test_blocks_a_channel_outside_the_allowlist(channel: str) -> None:
     assert upstream.calls == []
 
 
+WRITE_TOOLS: Final = ("slack_send_message", "slack_send_message_draft", "slack_schedule_message", "slack_add_reaction")
+
+
+@pytest.mark.parametrize("tool", WRITE_TOOLS)
+async def test_a_write_tool_may_post_to_an_allowlisted_channel(tool: str) -> None:
+    upstream = FakeUpstream()
+    arguments: dict[str, object] = {"channel_id": ENG_TEAM_ID, "message": "Deploy finished"}
+
+    result = await _call_tool(_proxy(upstream), tool, arguments)
+
+    assert result.isError is False
+    assert upstream.calls_for(tool) == [arguments]
+
+
+@pytest.mark.parametrize("tool", WRITE_TOOLS)
+@pytest.mark.parametrize(
+    "target",
+    [
+        "U04ABCDEFGH",  # a user ID, which Slack treats as a DM to that person
+        "D04ABCDEF",  # an existing DM conversation
+        "C0NOTALLOWED",  # a channel outside the allowlist
+        "#random-channel",
+    ],
+)
+async def test_a_write_tool_cannot_reach_a_dm_or_unlisted_channel(tool: str, target: str) -> None:
+    upstream = FakeUpstream()
+
+    result = await _call_tool(_proxy(upstream), tool, {"channel_id": target, "message": "hello"})
+
+    assert result.isError is True
+    assert target in result.content[0].text
+    assert upstream.calls == []
+
+
+@pytest.mark.parametrize("tool", WRITE_TOOLS)
+async def test_a_write_tool_that_names_no_channel_is_blocked(tool: str) -> None:
+    upstream = FakeUpstream()
+
+    result = await _call_tool(_proxy(upstream), tool, {"user_id": "U04ABCDEFGH", "message": "hello"})
+
+    assert result.isError is True
+    assert "named no channel" in result.content[0].text
+    assert upstream.calls == []
+
+
 async def test_blocks_a_tool_that_names_no_channel() -> None:
     upstream = FakeUpstream()
 
