@@ -3,7 +3,6 @@
 tests/e2e/.fixtures/
 .venv-typecheck
 .venv_policy_test
-.env
 .claude
 CLAUDE.local.md
 .newenv
@@ -44,7 +43,6 @@ langfuse.log
 litellm/tests/test_custom_logger.py
 litellm/tests/langfuse.log
 litellm/tests/dynamo*.log
-.vscode/settings.json
 litellm/proxy/log.txt
 proxy_server_config_@.yaml
 proxy_server_config_2.yaml
@@ -137,7 +135,6 @@ crash.log
 crash.*.log
 # .terraform.lock.hcl is intentionally NOT ignored — it pins provider versions
 # and should be committed.
-.vscode
 .pin_list.txt
 
 # pytest coverage data
@@ -148,3 +145,4 @@ litellm.log
 
 .mcp-build/
 config/local/
+config.bat

@@ -14,6 +14,7 @@ MCP_PYTHON_TARGETS=(
 MCP_DIRS=(
     "$MCP_ROOT/slack-mcp"
     "$MCP_ROOT/figma-mcp"
+    "$MCP_ROOT/bloomberg-mcp"
 )
 
 mkdir -p "$BUILD_ROOT"

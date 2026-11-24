@@ -45,3 +45,11 @@ mcp_servers:
       - file_content:read
     available_on_public_internet: false
     allow_all_keys: false
+  Bloomberg:
+    transport: http
+    url: "http://127.0.0.1:8001/mcp"
+    available_on_public_internet: false
+    allow_all_keys: false
+    allowed_tools:
+      - submit_last_price_request
+      - get_last_price_result
