@@ -5,6 +5,7 @@ ARG MCP_HOME=/app/mcp
 ARG TARGETARCH
 
 COPY --chown=65534:0 .mcp-build/slack-mcp/${TARGETARCH}/ ${MCP_HOME}/slack-mcp/
+COPY --chown=65534:0 .mcp-build/figma-mcp/ ${MCP_HOME}/figma-mcp/
 COPY --chown=65534:0 config/mcp-servers.yml ${MCP_HOME}/mcp-servers.yml
 COPY --chown=65534:0 mcp-servers/slack-mcp/channels.txt ${MCP_HOME}/channels.txt
 COPY --chown=65534:0 docker/merge_and_start.py /app/docker/merge_and_start.py
@@ -15,6 +16,8 @@ ENV SLACK_MCP_UPSTREAM_URL=https://mcp.slack.com/mcp \
     SLACK_MCP_SEARCH_TOOLS=slack_search_public \
     SLACK_MCP_ALLOWED_WITHOUT_CHANNEL=slack_read_file,slack_search_users
 RUN PYTHONPATH=${MCP_HOME}/slack-mcp/site-packages python -c "from slack_self_mcp.mcp_server import app; assert app is not None"
+RUN node -e "const [major, minor] = process.versions.node.split('.').map(Number); if (major < 20 || (major === 20 && minor < 20)) throw new Error('Figma MCP requires Node.js >= 20.20.0')"
+RUN node "${MCP_HOME}/figma-mcp/dist/bin.js" --help >/dev/null
 
 USER 65534
 
