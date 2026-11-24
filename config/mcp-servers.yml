@@ -60,10 +60,10 @@ mcp_servers:
       - account_info.read
       - files.metadata.read
       - files.content.read
+      - files.content.write
     available_on_public_internet: false
     allow_all_keys: false
-    # Read-only. Shared-link and download-link tools stay off so files are never exposed outside Dropbox's own access
-    # controls.
+    # Shared-link and download-link tools stay off so files are never exposed outside Dropbox's own access controls.
     allowed_tools:
       - WhoAmI
       - Search
@@ -72,3 +72,10 @@ mcp_servers:
       - GetFileContent
       - GetMarkdown
       - ListFileRevisions
+      - CreateFolder
+      - CreateFile
+      - Copy
+      - Move
+      - Delete
+      - RestoreFileRevision
+      - CheckJobStatus
