@@ -32,6 +32,19 @@ mcp_servers:
       - slack_send_message_draft
       - slack_schedule_message
       - slack_add_reaction
+  Figma:
+    transport: http
+    url: "http://127.0.0.1:3333/mcp"
+    auth_type: oauth2
+    oauth2_flow: authorization_code
+    authorization_url: https://www.figma.com/oauth
+    token_url: https://api.figma.com/v1/oauth/token
+    client_id: os.environ/FIGMA_CLIENT_ID
+    client_secret: os.environ/FIGMA_CLIENT_SECRET
+    scopes:
+      - file_content:read
+    available_on_public_internet: false
+    allow_all_keys: false
   Dropbox:
     transport: http
     url: "https://mcp.dropbox.com/mcp"
