@@ -18,6 +18,9 @@ MCP_ARTIFACT_DIR: Final = Path("/app/mcp/slack-mcp/site-packages")
 MCP_APP: Final = "slack_self_mcp.mcp_server:app"
 MCP_HOST: Final = "0.0.0.0"
 MCP_PORT: Final = "8000"
+BLOOMBERG_ARTIFACT_DIR: Final = Path("/app/mcp/bloomberg-mcp/site-packages")
+BLOOMBERG_APP: Final = "bloomberg_mcp.mcp_server:app"
+BLOOMBERG_PORT: Final = "8001"
 FIGMA_ARTIFACT_DIR: Final = Path("/app/mcp/figma-mcp")
 FIGMA_APP: Final = FIGMA_ARTIFACT_DIR / "dist/bin.js"
 MERGE_AND_START: Final = Path("/app/docker/merge_and_start.py")
@@ -33,6 +36,18 @@ def mcp_env() -> dict[str, str]:
     """The artifact is a relocatable dependency tree, so it is reached through PYTHONPATH."""
     inherited: Final = os.environ.get("PYTHONPATH")
     artifact_path: Final = f"{MCP_ARTIFACT_DIR}{os.pathsep}{inherited}" if inherited else str(MCP_ARTIFACT_DIR)
+    return {**os.environ, "PYTHONPATH": artifact_path}
+
+
+def bloomberg_command() -> list[str]:
+    return [sys.executable, "-m", "uvicorn", BLOOMBERG_APP, "--host", "127.0.0.1", "--port", BLOOMBERG_PORT]
+
+
+def bloomberg_env() -> dict[str, str]:
+    inherited: Final = os.environ.get("PYTHONPATH")
+    artifact_path: Final = (
+        f"{BLOOMBERG_ARTIFACT_DIR}{os.pathsep}{inherited}" if inherited else str(BLOOMBERG_ARTIFACT_DIR)
+    )
     return {**os.environ, "PYTHONPATH": artifact_path}
 
 
@@ -88,6 +103,9 @@ def main(argv: list[str] | None = None) -> int:
     ):
         sys.stderr.write(f"start-with-mcp: missing Figma artifact in {FIGMA_ARTIFACT_DIR}; rebuild the image\n")
         return 1
+    if not BLOOMBERG_ARTIFACT_DIR.is_dir():
+        sys.stderr.write(f"start-with-mcp: missing Bloomberg artifact in {BLOOMBERG_ARTIFACT_DIR}; rebuild the image\n")
+        return 1
 
     children: Final[list[subprocess.Popen[bytes]]] = []
     signals: Final[list[int]] = []
@@ -115,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
                 "node", str(FIGMA_APP), "--host", "127.0.0.1", "--port", "3333",
                 "--skip-image-downloads",
             ], env=figma_env, cwd=FIGMA_ARTIFACT_DIR))
+        if not signals:
+            children.append(subprocess.Popen(bloomberg_command(), env=bloomberg_env()))
         if not signals:
             children.append(subprocess.Popen([sys.executable, str(MERGE_AND_START), *passthrough]))
         return supervise(children, signals)
