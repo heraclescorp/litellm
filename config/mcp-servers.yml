@@ -45,3 +45,37 @@ mcp_servers:
       - file_content:read
     available_on_public_internet: false
     allow_all_keys: false
+  Dropbox:
+    transport: http
+    url: "https://mcp.dropbox.com/mcp"
+    auth_type: oauth2
+    oauth2_flow: authorization_code
+    # Dropbox only allows dynamic client registration for its own allowlist of clients, so the gateway presents
+    # the operator's own Dropbox app. token_access_type=offline is what makes Dropbox return a refresh token.
+    authorization_url: https://www.dropbox.com/oauth2/authorize?token_access_type=offline
+    token_url: https://api.dropboxapi.com/oauth2/token
+    client_id: os.environ/DROPBOX_CLIENT_ID
+    client_secret: os.environ/DROPBOX_CLIENT_SECRET
+    scopes:
+      - account_info.read
+      - files.metadata.read
+      - files.content.read
+      - files.content.write
+    available_on_public_internet: false
+    allow_all_keys: false
+    # Shared-link and download-link tools stay off so files are never exposed outside Dropbox's own access controls.
+    allowed_tools:
+      - WhoAmI
+      - Search
+      - ListFolder
+      - GetFileMetadata
+      - GetFileContent
+      - GetMarkdown
+      - ListFileRevisions
+      - CreateFolder
+      - CreateFile
+      - Copy
+      - Move
+      - Delete
+      - RestoreFileRevision
+      - CheckJobStatus
